@@ -40,6 +40,33 @@ class MemoryActionService {
     return updated;
   }
 
+  Future<MemoryRecord> attachAudio(
+    PhotoAsset asset,
+    String audioPath, {
+    DateTime? now,
+  }) async {
+    final timestamp = now ?? DateTime.now();
+    final existing = await repository.getByAssetId(asset.assetId);
+    final base = existing ??
+        MemoryRecord(
+          memoryId: _newMemoryId(asset, timestamp),
+          assetId: asset.assetId,
+          assetFingerprint: _assetFingerprint(asset),
+          photoTime: asset.createdAt,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+          promptQuestion: promptQuestion,
+        );
+
+    final updated = base.copyWith(
+      audioPath: audioPath,
+      reviewStatus: 'raw',
+      updatedAt: timestamp,
+    );
+    await repository.upsert(updated);
+    return updated;
+  }
+
   String _newMemoryId(PhotoAsset asset, DateTime now) {
     final safeAssetId = asset.assetId.replaceAll(RegExp(r'[^a-zA-Z0-9]+'), '_');
     return 'memory_${now.microsecondsSinceEpoch}_$safeAssetId';

@@ -7,6 +7,7 @@ import '../models/photo_asset.dart';
 import '../services/memory_action_service.dart';
 import '../services/memory_repository.dart';
 import '../services/photo_library_service.dart';
+import '../services/recording_service.dart';
 import '../utils/date_utils.dart';
 import '../widgets/action_buttons.dart';
 import '../widgets/photo_card.dart';
@@ -17,11 +18,15 @@ class MemoryCardScreen extends StatefulWidget {
     super.key,
     required this.photoLibraryService,
     required this.memoryRepository,
+    RecordingService Function()? recordingServiceFactory,
     Random? random,
-  }) : random = random ?? Random();
+  })  : recordingServiceFactory =
+            recordingServiceFactory ?? (() => RecordRecordingService()),
+        random = random ?? Random();
 
   final PhotoLibraryService photoLibraryService;
   final MemoryRepository memoryRepository;
+  final RecordingService Function() recordingServiceFactory;
   final Random random;
 
   @override
@@ -216,16 +221,27 @@ class _MemoryCardScreenState extends State<MemoryCardScreen> {
     }
   }
 
-  void _openRecordPlaceholder() {
+  Future<void> _openRecordPlaceholder() async {
     final asset = _currentAsset;
     if (asset == null) {
       return;
     }
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => RecordMemoryScreen(asset: asset),
+    final saved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => RecordMemoryScreen(
+          asset: asset,
+          memoryRepository: widget.memoryRepository,
+          recordingService: widget.recordingServiceFactory(),
+        ),
       ),
     );
+    if (!mounted || saved != true) {
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('录音已保存')),
+    );
+    await _pickRandomPhoto();
   }
 }
 

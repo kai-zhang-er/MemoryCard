@@ -28,8 +28,11 @@
 	<true/>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Memory Cards reads your local photo library to show read-only memory cards. Photos are not uploaded or modified.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Memory Cards records your spoken memory and stores the audio locally on this device.</string>
 	<key>PHPhotoLibraryPreventAutomaticLimitedAccessAlert</key>
-	<true/>	<key>UIApplicationSceneManifest</key>
+	<true/>
+	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
 		<false/>
@@ -71,4 +74,6 @@
 	</array>
 </dict>
 </plist>
+
+
 

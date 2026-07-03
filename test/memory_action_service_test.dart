@@ -100,6 +100,42 @@ void main() {
     expect(saved.deleteCandidate, isTrue);
     expect(saved.updatedAt, DateTime.utc(2026, 7, 3, 10));
   });
+  test('attaches audio path to a new record', () async {
+    await service.attachAudio(
+      _asset('photo_001'),
+      'audio/2026/memory_photo_001.m4a',
+      now: DateTime.utc(2026, 7, 3),
+    );
+
+    final saved = await repository.getByAssetId('photo_001');
+
+    expect(saved, isNotNull);
+    expect(saved!.audioPath, 'audio/2026/memory_photo_001.m4a');
+    expect(saved.transcript, '');
+    expect(saved.memoryText, '');
+    expect(saved.reviewStatus, 'raw');
+  });
+
+  test('attaching audio preserves existing flags', () async {
+    final asset = _asset('photo_001');
+    await service.saveAction(
+      asset,
+      MemoryRecordAction.important,
+      now: DateTime.utc(2026, 7, 3, 9),
+    );
+    await service.attachAudio(
+      asset,
+      'audio/2026/memory_photo_001.m4a',
+      now: DateTime.utc(2026, 7, 3, 10),
+    );
+
+    final saved = await repository.getByAssetId('photo_001');
+
+    expect(saved, isNotNull);
+    expect(saved!.important, isTrue);
+    expect(saved.audioPath, 'audio/2026/memory_photo_001.m4a');
+    expect(saved.updatedAt, DateTime.utc(2026, 7, 3, 10));
+  });
 }
 
 PhotoAsset _asset(String id) {

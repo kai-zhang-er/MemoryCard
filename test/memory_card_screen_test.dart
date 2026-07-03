@@ -9,6 +9,7 @@ import 'package:memory_cards/models/photo_asset.dart';
 import 'package:memory_cards/screens/memory_card_screen.dart';
 import 'package:memory_cards/services/memory_repository.dart';
 import 'package:memory_cards/services/photo_library_service.dart';
+import 'package:memory_cards/services/recording_service.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 void main() {
@@ -89,7 +90,8 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
-    expect(find.text('录音功能将在 Task 4 接入'), findsOneWidget);
+    expect(find.text('说说这张照片'), findsOneWidget);
+    expect(find.text('开始录音'), findsOneWidget);
   });
 }
 
@@ -104,6 +106,7 @@ Future<void> _pumpCard(
       home: MemoryCardScreen(
         photoLibraryService: service,
         memoryRepository: repository,
+        recordingServiceFactory: () => _FakeRecordingService(),
         random: random ?? Random(1),
       ),
     ),
@@ -159,6 +162,28 @@ class _FakePhotoLibraryService implements PhotoLibraryService {
   Future<PhotoPermissionResult> requestPermission() async {
     return permission;
   }
+}
+
+class _FakeRecordingService implements RecordingService {
+  @override
+  Future<void> cancel() async {}
+
+  @override
+  Future<void> dispose() async {}
+
+  @override
+  Future<bool> hasPermission() async => true;
+
+  @override
+  Future<RecordingStartResult> start(String assetId, {DateTime? now}) async {
+    return RecordingStartResult(
+      absolutePath: 'C:/tmp/$assetId.m4a',
+      relativePath: 'audio/2026/$assetId.m4a',
+    );
+  }
+
+  @override
+  Future<String?> stop() async => 'audio/2026/fake.m4a';
 }
 
 final Uint8List _onePixelPng = base64Decode(
