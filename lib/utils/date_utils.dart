@@ -1,4 +1,4 @@
-﻿String formatNullableDate(DateTime? value) {
+String formatNullableDate(DateTime? value) {
   if (value == null) {
     return '未知时间';
   }

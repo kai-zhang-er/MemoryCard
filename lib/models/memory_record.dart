@@ -1,4 +1,4 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 
 class MemoryRecord {
   const MemoryRecord({
@@ -115,8 +115,7 @@ class MemoryRecord {
       skipped: _boolFromDb(map['skipped']),
       userTags: _stringListFromJson(map['user_tags']),
       aiLightTags: _stringListFromJson(map['ai_light_tags']),
-      promptQuestion:
-          map['prompt_question'] as String? ?? '这张照片你还记得吗？',
+      promptQuestion: map['prompt_question'] as String? ?? '这张照片你还记得吗？',
       audioPath: map['audio_path'] as String?,
       transcript: map['transcript'] as String? ?? '',
       memoryText: map['memory_text'] as String? ?? '',

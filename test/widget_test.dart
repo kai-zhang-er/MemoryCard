@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:memory_cards/models/memory_record.dart';
 import 'package:memory_cards/widgets/record_status_chips.dart';

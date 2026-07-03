@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 import 'screens/home_screen.dart';
 import 'services/memory_repository.dart';

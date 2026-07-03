@@ -12,3 +12,5 @@ coverage/
 .idea/
 
 .metadata
+test/failures/
+

@@ -1,7 +1,9 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 import '../models/memory_record.dart';
 import '../services/memory_repository.dart';
+import '../services/photo_library_service.dart';
+import 'memory_card_screen.dart';
 import 'memory_list_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -33,6 +35,12 @@ class _HomeScreenState extends State<HomeScreen> {
             const Text('任务一数据库验证：先用假数据确认本地记录可以写入和读取。'),
             const SizedBox(height: 20),
             FilledButton.icon(
+              onPressed: _openMemoryCard,
+              icon: const Icon(Icons.play_arrow),
+              label: const Text('开始一局'),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
               onPressed: _isSaving ? null : _addFakeRecord,
               icon: const Icon(Icons.add),
               label: Text(_isSaving ? '保存中...' : '添加一条假记忆'),
@@ -57,7 +65,7 @@ class _HomeScreenState extends State<HomeScreen> {
             const Card(
               child: Padding(
                 padding: EdgeInsets.all(16),
-                child: Text('隐私提示：照片和录音只保存在本机。本阶段不会读取相册、录音或上传任何数据。'),
+                child: Text('隐私提示：只读取本地照片缩略图和元数据，不复制原图、不录音、不上传。'),
               ),
             ),
           ],
@@ -108,6 +116,16 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  void _openMemoryCard() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => MemoryCardScreen(
+          photoLibraryService: const PhotoManagerPhotoLibraryService(),
+        ),
+      ),
+    );
+  }
+
   void _openList(MemoryListFilter filter) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -119,4 +137,3 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 }
-

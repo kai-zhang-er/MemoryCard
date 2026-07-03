@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 import '../models/memory_record.dart';
 import '../services/memory_repository.dart';
@@ -81,7 +81,8 @@ class _MemoryListScreenState extends State<MemoryListScreen> {
     return switch (widget.filter) {
       MemoryListFilter.all => widget.repository.getAll(),
       MemoryListFilter.important => widget.repository.getImportant(),
-      MemoryListFilter.deleteCandidates => widget.repository.getDeleteCandidates(),
+      MemoryListFilter.deleteCandidates =>
+        widget.repository.getDeleteCandidates(),
     };
   }
 

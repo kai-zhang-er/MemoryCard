@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 class PhotoCard extends StatelessWidget {
   const PhotoCard({super.key, required this.child});

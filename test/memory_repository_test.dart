@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:memory_cards/models/memory_record.dart';
@@ -48,7 +48,8 @@ void main() {
 
     expect(all, hasLength(3));
     expect(important.map((record) => record.memoryId), contains('memory_001'));
-    expect(deleteCandidates.map((record) => record.memoryId), contains('memory_002'));
+    expect(deleteCandidates.map((record) => record.memoryId),
+        contains('memory_002'));
   });
 
   test('updates and deletes records', () async {
