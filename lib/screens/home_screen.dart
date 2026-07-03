@@ -121,6 +121,7 @@ class _HomeScreenState extends State<HomeScreen> {
       MaterialPageRoute<void>(
         builder: (_) => MemoryCardScreen(
           photoLibraryService: const PhotoManagerPhotoLibraryService(),
+          memoryRepository: widget.repository,
         ),
       ),
     );

@@ -72,6 +72,21 @@ class MemoryRepository {
     return MemoryRecord.fromMap(rows.first);
   }
 
+  Future<MemoryRecord?> getByAssetId(String assetId) async {
+    final db = await database;
+    final rows = await db.query(
+      tableName,
+      where: 'asset_id = ?',
+      whereArgs: [assetId],
+      orderBy: 'updated_at DESC',
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      return null;
+    }
+    return MemoryRecord.fromMap(rows.first);
+  }
+
   Future<List<MemoryRecord>> getImportant() async {
     return _getWhereFlag('important');
   }

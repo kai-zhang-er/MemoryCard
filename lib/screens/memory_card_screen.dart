@@ -4,18 +4,24 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 
 import '../models/photo_asset.dart';
+import '../services/memory_action_service.dart';
+import '../services/memory_repository.dart';
 import '../services/photo_library_service.dart';
 import '../utils/date_utils.dart';
+import '../widgets/action_buttons.dart';
 import '../widgets/photo_card.dart';
+import 'record_memory_screen.dart';
 
 class MemoryCardScreen extends StatefulWidget {
   MemoryCardScreen({
     super.key,
     required this.photoLibraryService,
+    required this.memoryRepository,
     Random? random,
   }) : random = random ?? Random();
 
   final PhotoLibraryService photoLibraryService;
+  final MemoryRepository memoryRepository;
   final Random random;
 
   @override
@@ -23,12 +29,15 @@ class MemoryCardScreen extends StatefulWidget {
 }
 
 class _MemoryCardScreenState extends State<MemoryCardScreen> {
+  static const String _promptQuestion = MemoryActionService.promptQuestion;
+
   MemoryCardState _state = MemoryCardState.loading;
   PhotoPermissionResult? _permission;
   List<PhotoAsset> _assets = const [];
   PhotoAsset? _currentAsset;
   Uint8List? _thumbnailBytes;
   String? _errorMessage;
+  bool _isSavingAction = false;
 
   @override
   void initState() {
@@ -72,7 +81,14 @@ class _MemoryCardScreenState extends State<MemoryCardScreen> {
                 asset: _currentAsset!,
                 thumbnailBytes: _thumbnailBytes!,
                 isLimited: _permission == PhotoPermissionResult.limited,
-                onPickAnother: _pickRandomPhoto,
+                isSavingAction: _isSavingAction,
+                promptQuestion: _promptQuestion,
+                onTalk: _openRecordPlaceholder,
+                onMarkImportant: () =>
+                    _saveAction(MemoryRecordAction.important),
+                onMarkDeleteCandidate: () =>
+                    _saveAction(MemoryRecordAction.deleteCandidate),
+                onSkip: () => _saveAction(MemoryRecordAction.skipped),
               ),
           },
         ),
@@ -134,6 +150,7 @@ class _MemoryCardScreenState extends State<MemoryCardScreen> {
     setState(() {
       _state = MemoryCardState.loading;
       _errorMessage = null;
+      _isSavingAction = false;
     });
 
     final asset = _assets[widget.random.nextInt(_assets.length)];
@@ -170,6 +187,46 @@ class _MemoryCardScreenState extends State<MemoryCardScreen> {
       });
     }
   }
+
+  Future<void> _saveAction(MemoryRecordAction action) async {
+    final asset = _currentAsset;
+    if (asset == null || _isSavingAction) {
+      return;
+    }
+
+    setState(() => _isSavingAction = true);
+    try {
+      await MemoryActionService(widget.memoryRepository)
+          .saveAction(asset, action);
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${action.confirmationText}，已保存')),
+      );
+      await _pickRandomPhoto();
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _isSavingAction = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('保存失败：$error')),
+      );
+    }
+  }
+
+  void _openRecordPlaceholder() {
+    final asset = _currentAsset;
+    if (asset == null) {
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => RecordMemoryScreen(asset: asset),
+      ),
+    );
+  }
 }
 
 enum MemoryCardState {
@@ -185,16 +242,27 @@ class _LoadedPhotoView extends StatelessWidget {
     required this.asset,
     required this.thumbnailBytes,
     required this.isLimited,
-    required this.onPickAnother,
+    required this.isSavingAction,
+    required this.promptQuestion,
+    required this.onTalk,
+    required this.onMarkImportant,
+    required this.onMarkDeleteCandidate,
+    required this.onSkip,
   });
 
   final PhotoAsset asset;
   final Uint8List thumbnailBytes;
   final bool isLimited;
-  final VoidCallback onPickAnother;
+  final bool isSavingAction;
+  final String promptQuestion;
+  final VoidCallback onTalk;
+  final VoidCallback onMarkImportant;
+  final VoidCallback onMarkDeleteCandidate;
+  final VoidCallback onSkip;
 
   @override
   Widget build(BuildContext context) {
+    final actionHandler = isSavingAction ? null : onTalk;
     return ListView(
       children: [
         PhotoCard(
@@ -206,7 +274,7 @@ class _LoadedPhotoView extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         Text(
-          '这张照片你还记得吗？',
+          promptQuestion,
           style: Theme.of(context).textTheme.titleLarge,
           textAlign: TextAlign.center,
         ),
@@ -224,14 +292,37 @@ class _LoadedPhotoView extends StatelessWidget {
           ),
         ],
         const SizedBox(height: 20),
-        FilledButton.icon(
-          onPressed: onPickAnother,
-          icon: const Icon(Icons.shuffle),
-          label: const Text('换一张'),
+        ActionButtons(
+          children: [
+            FilledButton.icon(
+              onPressed: actionHandler,
+              icon: const Icon(Icons.mic_none),
+              label: const Text('讲讲'),
+            ),
+            OutlinedButton.icon(
+              onPressed: isSavingAction ? null : onMarkImportant,
+              icon: const Icon(Icons.star_outline),
+              label: const Text('重要'),
+            ),
+            OutlinedButton.icon(
+              onPressed: isSavingAction ? null : onMarkDeleteCandidate,
+              icon: const Icon(Icons.delete_outline),
+              label: const Text('待删除'),
+            ),
+            TextButton.icon(
+              onPressed: isSavingAction ? null : onSkip,
+              icon: const Icon(Icons.skip_next),
+              label: const Text('跳过'),
+            ),
+          ],
         ),
+        if (isSavingAction) ...[
+          const SizedBox(height: 16),
+          const Center(child: CircularProgressIndicator()),
+        ],
         const SizedBox(height: 12),
         Text(
-          isLimited ? '当前是有限相册授权，只会显示你允许访问的照片。' : '照片只读显示，不会复制、修改或上传。',
+          isLimited ? '当前是有限相册授权，只会显示你允许访问的照片。' : '照片只读显示，不会复制、修改、删除或上传。',
           textAlign: TextAlign.center,
         ),
       ],

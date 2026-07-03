@@ -43,7 +43,9 @@ class _MemoryListScreenState extends State<MemoryListScreen> {
 
           final records = snapshot.data ?? const <MemoryRecord>[];
           if (records.isEmpty) {
-            return const Center(child: Text('还没有记录。先回首页添加一条假记忆。'));
+            return const Center(
+              child: Text('还没有记录。回到首页开始一局，或添加一条假记忆验证数据库。'),
+            );
           }
 
           return RefreshIndicator(

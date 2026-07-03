@@ -52,6 +52,21 @@ void main() {
         contains('memory_002'));
   });
 
+  test('finds latest record by asset id', () async {
+    final first = _record('memory_001');
+    final second = _record('memory_002').copyWith(
+      assetId: first.assetId,
+      updatedAt: first.updatedAt.add(const Duration(minutes: 5)),
+    );
+
+    await repository.upsert(first);
+    await repository.upsert(second);
+
+    final saved = await repository.getByAssetId(first.assetId);
+
+    expect(saved, isNotNull);
+    expect(saved!.memoryId, second.memoryId);
+  });
   test('updates and deletes records', () async {
     final record = _record('memory_001');
     await repository.upsert(record);
