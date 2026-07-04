@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
@@ -14,11 +15,13 @@ class RecordMemoryScreen extends StatefulWidget {
     required this.asset,
     required this.memoryRepository,
     required this.recordingService,
+    this.thumbnailBytes,
   });
 
   final PhotoAsset asset;
   final MemoryRepository memoryRepository;
   final RecordingService recordingService;
+  final Uint8List? thumbnailBytes;
 
   @override
   State<RecordMemoryScreen> createState() => _RecordMemoryScreenState();
@@ -49,6 +52,26 @@ class _RecordMemoryScreenState extends State<RecordMemoryScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                if (widget.thumbnailBytes != null) ...[
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 360),
+                    child: AspectRatio(
+                      aspectRatio: 16 / 9,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: ColoredBox(
+                          color: Colors.black,
+                          child: Image.memory(
+                            widget.thumbnailBytes!,
+                            fit: BoxFit.contain,
+                            gaplessPlayback: true,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
                 Icon(_state.icon, size: 56),
                 const SizedBox(height: 16),
                 Text(

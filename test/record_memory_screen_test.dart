@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -42,6 +44,19 @@ void main() {
     expect(find.text('重新请求'), findsOneWidget);
   });
 
+  testWidgets('shows the current photo thumbnail while recording',
+      (tester) async {
+    final service = _FakeRecordingService(hasPermissionValue: true);
+
+    await _pumpScreen(
+      tester,
+      service,
+      repository,
+      thumbnailBytes: _onePixelPng,
+    );
+
+    expect(find.byType(Image), findsOneWidget);
+  });
   testWidgets('discarding recording does not write record', (tester) async {
     final service = _FakeRecordingService(
       hasPermissionValue: true,
@@ -62,14 +77,16 @@ void main() {
 Future<void> _pumpScreen(
   WidgetTester tester,
   RecordingService recordingService,
-  MemoryRepository repository,
-) async {
+  MemoryRepository repository, {
+  Uint8List? thumbnailBytes,
+}) async {
   await tester.pumpWidget(
     MaterialApp(
       home: RecordMemoryScreen(
         asset: _asset('photo_001'),
         memoryRepository: repository,
         recordingService: recordingService,
+        thumbnailBytes: thumbnailBytes,
       ),
     ),
   );
@@ -125,3 +142,7 @@ class _FakeRecordingService implements RecordingService {
     return stopPath;
   }
 }
+
+final Uint8List _onePixelPng = base64Decode(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lK3Q2wAAAABJRU5ErkJggg==',
+);

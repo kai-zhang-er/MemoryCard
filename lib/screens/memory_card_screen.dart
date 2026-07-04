@@ -1,4 +1,4 @@
-﻿import 'dart:math';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -270,6 +270,7 @@ class _MemoryCardScreenState extends State<MemoryCardScreen> {
           asset: asset,
           memoryRepository: widget.memoryRepository,
           recordingService: widget.recordingServiceFactory(),
+          thumbnailBytes: _thumbnailBytes,
         ),
       ),
     );
@@ -332,10 +333,15 @@ class _LoadedPhotoView extends StatelessWidget {
     return ListView(
       children: [
         PhotoCard(
-          child: Image.memory(
-            thumbnailBytes,
-            fit: BoxFit.cover,
-            gaplessPlayback: true,
+          child: ColoredBox(
+            color: Colors.black,
+            child: Center(
+              child: Image.memory(
+                thumbnailBytes,
+                fit: BoxFit.contain,
+                gaplessPlayback: true,
+              ),
+            ),
           ),
         ),
         const SizedBox(height: 16),

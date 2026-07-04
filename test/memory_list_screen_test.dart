@@ -1,16 +1,22 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:memory_cards/models/memory_record.dart';
+import 'package:memory_cards/models/photo_asset.dart';
 import 'package:memory_cards/screens/memory_list_screen.dart';
 import 'package:memory_cards/services/audio_playback_service.dart';
 import 'package:memory_cards/services/memory_repository.dart';
+import 'package:memory_cards/services/photo_library_service.dart';
 import 'package:memory_cards/widgets/audio_player_tile.dart';
+import 'package:memory_cards/widgets/memory_thumbnail.dart';
 
 void main() {
-  testWidgets('MemoryListScreen shows playback only for audio records',
+  testWidgets('MemoryListScreen shows thumbnails and audio playback controls',
       (tester) async {
+    final photoLibraryService = _FakePhotoLibraryService();
     final repository = _FakeMemoryRepository([
       _record('memory_with_audio').copyWith(
         audioPath: 'audio/2026/memory.m4a',
@@ -23,14 +29,21 @@ void main() {
         home: MemoryListScreen(
           repository: repository,
           filter: MemoryListFilter.all,
+          photoLibraryService: photoLibraryService,
           audioPlaybackControllerFactory: _FakeAudioPlaybackController.new,
         ),
       ),
     );
     await tester.pump();
+    await tester.pump();
 
+    expect(find.byType(MemoryThumbnail), findsNWidgets(2));
     expect(find.byType(AudioPlayerTile), findsOneWidget);
     expect(find.text('播放录音'), findsOneWidget);
+    expect(
+      photoLibraryService.thumbnailRequests,
+      containsAll(['asset_memory_with_audio', 'asset_memory_without_audio']),
+    );
   });
 }
 
@@ -39,6 +52,7 @@ MemoryRecord _record(String id) {
   return MemoryRecord(
     memoryId: id,
     assetId: 'asset_$id',
+    photoTime: now.subtract(const Duration(days: 400)),
     createdAt: now,
     updatedAt: now,
   );
@@ -59,6 +73,29 @@ class _FakeMemoryRepository extends MemoryRepository {
   @override
   Future<List<MemoryRecord>> getDeleteCandidates() async =>
       records.where((record) => record.deleteCandidate).toList(growable: false);
+}
+
+class _FakePhotoLibraryService implements PhotoLibraryService {
+  final List<String> thumbnailRequests = [];
+
+  @override
+  Future<List<PhotoAsset>> getPhotoAssets({int limit = 80}) async => const [];
+
+  @override
+  Future<DateTime?> getPhotoTime(String assetId) async => null;
+
+  @override
+  Future<Uint8List?> getThumbnail(String assetId, {int size = 900}) async {
+    thumbnailRequests.add(assetId);
+    return _onePixelPng;
+  }
+
+  @override
+  Future<void> openSettings() async {}
+
+  @override
+  Future<PhotoPermissionResult> requestPermission() async =>
+      PhotoPermissionResult.authorized;
 }
 
 class _FakeAudioPlaybackController implements AudioPlaybackController {
@@ -97,3 +134,7 @@ class _FakeAudioPlaybackController implements AudioPlaybackController {
     await _durationController.close();
   }
 }
+
+final Uint8List _onePixelPng = base64Decode(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lK3Q2wAAAABJRU5ErkJggg==',
+);

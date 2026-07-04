@@ -3,7 +3,10 @@ import 'package:flutter/material.dart';
 import '../models/memory_record.dart';
 import '../services/audio_playback_service.dart';
 import '../services/memory_repository.dart';
+import '../services/photo_library_service.dart';
+import '../utils/date_utils.dart';
 import '../widgets/audio_player_tile.dart';
+import '../widgets/memory_thumbnail.dart';
 import '../widgets/record_status_chips.dart';
 
 class MemoryListScreen extends StatefulWidget {
@@ -11,11 +14,13 @@ class MemoryListScreen extends StatefulWidget {
     super.key,
     required this.repository,
     required this.filter,
+    required this.photoLibraryService,
     this.audioPlaybackControllerFactory = createAudioPlaybackController,
   });
 
   final MemoryRepository repository;
   final MemoryListFilter filter;
+  final PhotoLibraryService photoLibraryService;
   final AudioPlaybackController Function() audioPlaybackControllerFactory;
 
   @override
@@ -62,11 +67,17 @@ class _MemoryListScreenState extends State<MemoryListScreen> {
                 final record = records[index];
                 return Card(
                   child: ListTile(
-                    title: Text(record.assetId),
+                    leading: MemoryThumbnail(
+                      assetId: record.assetId,
+                      photoLibraryService: widget.photoLibraryService,
+                    ),
+                    title: const Text('照片记忆'),
                     subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const SizedBox(height: 8),
+                        Text('拍摄时间: ${formatNullableDate(record.photoTime)}'),
+                        Text('Asset ID: ${record.assetId}'),
                         Text('Memory ID: ${record.memoryId}'),
                         Text('更新时间: ${record.updatedAt.toLocal()}'),
                         const SizedBox(height: 8),

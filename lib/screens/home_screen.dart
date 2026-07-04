@@ -174,6 +174,7 @@ class _HomeScreenState extends State<HomeScreen> {
         builder: (_) => MemoryListScreen(
           repository: widget.repository,
           filter: filter,
+          photoLibraryService: widget.photoLibraryServiceFactory(),
         ),
       ),
     );
