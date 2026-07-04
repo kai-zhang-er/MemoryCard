@@ -11,6 +11,9 @@ dependencies:
     sdk: flutter
   photo_manager: ^3.9.0
   file_selector: ^1.1.0
+  just_audio: ^0.10.6
+  just_audio_media_kit: ^2.1.0
+  media_kit_libs_windows_audio: ^1.0.9
   record: ^7.1.1
   path: ^1.9.0
   path_provider: ^2.1.5

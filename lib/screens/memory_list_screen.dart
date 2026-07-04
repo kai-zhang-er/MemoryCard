@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../models/memory_record.dart';
+import '../services/audio_playback_service.dart';
 import '../services/memory_repository.dart';
+import '../widgets/audio_player_tile.dart';
 import '../widgets/record_status_chips.dart';
 
 class MemoryListScreen extends StatefulWidget {
@@ -9,10 +11,12 @@ class MemoryListScreen extends StatefulWidget {
     super.key,
     required this.repository,
     required this.filter,
+    this.audioPlaybackControllerFactory = createAudioPlaybackController,
   });
 
   final MemoryRepository repository;
   final MemoryListFilter filter;
+  final AudioPlaybackController Function() audioPlaybackControllerFactory;
 
   @override
   State<MemoryListScreen> createState() => _MemoryListScreenState();
@@ -67,6 +71,13 @@ class _MemoryListScreenState extends State<MemoryListScreen> {
                         Text('更新时间: ${record.updatedAt.toLocal()}'),
                         const SizedBox(height: 8),
                         RecordStatusChips(record: record),
+                        if (record.audioPath != null &&
+                            record.audioPath!.trim().isNotEmpty)
+                          AudioPlayerTile(
+                            audioPath: record.audioPath!,
+                            controllerFactory:
+                                widget.audioPlaybackControllerFactory,
+                          ),
                       ],
                     ),
                   ),
