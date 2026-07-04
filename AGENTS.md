@@ -2,50 +2,45 @@
 
 ## Project Structure & Module Organization
 
-This repository is for the Flutter MVP of **Memory Cards**, an offline-first mobile photo memory app. Keep app code in `lib/`, tests in `test/`, and static files in `assets/`.
+Memory Cards is an offline-first Flutter MVP for local photo memory review across iOS, Android, and Windows. App code lives in `lib/`, tests in `test/`, and platform scaffolds in `android/`, `ios/`, `windows/`, and `web/`.
 
-Recommended layout:
-
-- `lib/main.dart` and `lib/app.dart`: entry point, routing, and theme.
-- `lib/models/`: data objects such as `memory_record.dart` and `photo_asset.dart`.
-- `lib/services/`: photo access, SQLite storage, recording, weighted random selection, and export logic.
+- `lib/main.dart` and `lib/app.dart`: app startup, platform service selection, theme, and root screen.
+- `lib/models/`: serializable data objects such as `MemoryRecord` and `PhotoAsset`.
+- `lib/services/`: SQLite storage, photo access, recording, weighted selection, export, and action logic.
 - `lib/screens/`: home, memory card, recording, and memory list flows.
-- `lib/widgets/`: reusable UI pieces such as photo cards and action buttons.
-- `lib/utils/`: focused helpers for dates, JSON, and formatting.
+- `lib/widgets/` and `lib/utils/`: reusable UI and focused helpers.
 
-Keep business logic out of widgets when it belongs in a service or model.
+Keep privacy-sensitive or platform-specific behavior in services, not directly inside widgets.
 
 ## Build, Test, and Development Commands
 
-Use standard Flutter commands:
+Use the bundled Flutter SDK if Flutter is not on PATH: `D:\Software\FlutterSDK\flutter\bin\flutter.bat`.
 
-- `flutter pub get`: install dependencies.
-- `flutter run`: run on a connected simulator or device.
-- `flutter analyze`: run static analysis and lint checks.
-- `flutter test`: run unit and widget tests.
-- `flutter build apk`: build an Android release artifact.
-- `flutter build ios`: build an iOS release artifact on macOS.
-
-Run `flutter analyze` and `flutter test` before submitting changes.
+- `flutter pub get`: install dependencies and refresh generated plugin files.
+- `flutter analyze`: run Dart and Flutter static checks.
+- `flutter test`: run unit, widget, and golden tests.
+- `flutter test --update-goldens`: update intentional UI snapshot changes.
+- `flutter build windows`: verify desktop builds when Visual Studio Desktop C++ tools are installed.
+- `flutter build apk` / `flutter build ios`: build mobile artifacts; iOS requires macOS/Xcode.
 
 ## Coding Style & Naming Conventions
 
-Follow Dart and Flutter defaults: two-space indentation, trailing commas for readable widget trees, and `dart format` formatting. Use `lower_snake_case.dart` for files, `UpperCamelCase` for classes, and `lowerCamelCase` for methods, variables, and fields.
+Follow Dart defaults: two-space indentation, trailing commas in multiline widget trees, `lower_snake_case.dart` files, `UpperCamelCase` classes, and `lowerCamelCase` members. Run `dart format lib test` before final verification.
 
-Use clear service names such as `MemoryRepository`, `PhotoLibraryService`, and `ExportService`. Add short comments only where privacy or platform behavior needs clarification.
+Prefer dependency injection for platform services. Mobile photo access uses `PhotoManagerPhotoLibraryService`; Windows uses `WindowsFolderPhotoLibraryService`. Windows SQLite must use `sqflite_common_ffi`; mobile keeps `sqflite`.
 
 ## Testing Guidelines
 
-Use Flutter's built-in `flutter_test` framework. Put tests in `test/` and name files with `_test.dart`, for example `memory_repository_test.dart`.
+Use `flutter_test`; name test files `*_test.dart`. Cover model serialization, repository behavior, weighted random selection, export JSON shape, photo service scanning, and key widget states. Avoid tests that rely on real device permissions, real photo libraries, or microphone hardware; use fakes and injected services.
 
-Prioritize tests for data serialization, repository behavior, weighted photo selection, and JSON export. Widget tests should cover marking a photo important, skipping, and showing saved records.
+Golden tests live under `test/goldens/`. Update them only for intentional visual changes.
 
 ## Commit & Pull Request Guidelines
 
-No Git history is available yet, so use concise imperative commit messages going forward, such as `Add memory repository` or `Implement JSON export`.
+Recent commits use short imperative or task-style messages, for example `Implement task 4 local audio recording` and `task 4 finished`. Keep commits focused and include generated plugin/lockfile changes when dependencies change.
 
-Pull requests should include a summary, tests run, screenshots or recordings for UI changes, and any iOS or Android permission configuration changes. Link related issues when available.
+Pull requests should summarize behavior, list verification commands, note platform limitations, and include screenshots for UI changes.
 
 ## Security & Privacy Guidelines
 
-The MVP must not upload photos, recordings, or memory records. Do not add cloud sync, accounts, real photo deletion, transcription, or network calls without explicit product approval. Original photo assets are read-only; store only app-owned metadata and local recording paths.
+Do not upload photos, recordings, or memory records. Do not add accounts, cloud sync, transcription, real photo deletion, or network calls without explicit approval. Photos are read-only: iOS/Android access the photo library; Windows scans a user-selected folder. Store only SQLite metadata, local audio paths, and user-initiated JSON exports.
