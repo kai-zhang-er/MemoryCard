@@ -1,15 +1,24 @@
 import 'package:flutter/material.dart';
 
 import '../models/memory_record.dart';
+import '../services/export_service.dart';
 import '../services/memory_repository.dart';
 import '../services/photo_library_service.dart';
 import 'memory_card_screen.dart';
 import 'memory_list_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key, required this.repository});
+  const HomeScreen({
+    super.key,
+    required this.repository,
+    required this.photoLibraryServiceFactory,
+    this.exportServiceFactory,
+  });
 
   final MemoryRepository repository;
+  final PhotoLibraryService Function() photoLibraryServiceFactory;
+  final ExportService Function(MemoryRepository repository)?
+      exportServiceFactory;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -18,6 +27,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _fakeRecordCount = 0;
   bool _isSaving = false;
+  bool _isExporting = false;
 
   @override
   Widget build(BuildContext context) {
@@ -60,6 +70,11 @@ class _HomeScreenState extends State<HomeScreen> {
               onPressed: () => _openList(MemoryListFilter.deleteCandidates),
               icon: const Icon(Icons.delete_outline),
               label: const Text('查看待删除'),
+            ),
+            OutlinedButton.icon(
+              onPressed: _isExporting ? null : _exportJson,
+              icon: const Icon(Icons.file_download_outlined),
+              label: Text(_isExporting ? '导出中...' : '导出 JSON'),
             ),
             const SizedBox(height: 24),
             const Card(
@@ -116,11 +131,37 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _exportJson() async {
+    setState(() => _isExporting = true);
+    try {
+      final service = widget.exportServiceFactory?.call(widget.repository) ??
+          ExportService(widget.repository);
+      final file = await service.exportMemoriesJson();
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('已导出：${file.path}')),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('导出失败：$error')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isExporting = false);
+      }
+    }
+  }
+
   void _openMemoryCard() {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => MemoryCardScreen(
-          photoLibraryService: const PhotoManagerPhotoLibraryService(),
+          photoLibraryService: widget.photoLibraryServiceFactory(),
           memoryRepository: widget.repository,
         ),
       ),

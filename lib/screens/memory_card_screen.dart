@@ -1,4 +1,4 @@
-import 'dart:math';
+﻿import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -8,6 +8,7 @@ import '../services/memory_action_service.dart';
 import '../services/memory_repository.dart';
 import '../services/photo_library_service.dart';
 import '../services/recording_service.dart';
+import '../services/weighted_random_service.dart';
 import '../utils/date_utils.dart';
 import '../widgets/action_buttons.dart';
 import '../widgets/photo_card.dart';
@@ -19,6 +20,8 @@ class MemoryCardScreen extends StatefulWidget {
     required this.photoLibraryService,
     required this.memoryRepository,
     RecordingService Function()? recordingServiceFactory,
+    this.processedAssetIdsLoader,
+    this.weightedRandomService = const WeightedRandomService(),
     Random? random,
   })  : recordingServiceFactory =
             recordingServiceFactory ?? (() => RecordRecordingService()),
@@ -27,6 +30,8 @@ class MemoryCardScreen extends StatefulWidget {
   final PhotoLibraryService photoLibraryService;
   final MemoryRepository memoryRepository;
   final RecordingService Function() recordingServiceFactory;
+  final Future<Set<String>> Function()? processedAssetIdsLoader;
+  final WeightedRandomService weightedRandomService;
   final Random random;
 
   @override
@@ -39,10 +44,24 @@ class _MemoryCardScreenState extends State<MemoryCardScreen> {
   MemoryCardState _state = MemoryCardState.loading;
   PhotoPermissionResult? _permission;
   List<PhotoAsset> _assets = const [];
+  Set<String> _processedAssetIds = const {};
   PhotoAsset? _currentAsset;
   Uint8List? _thumbnailBytes;
   String? _errorMessage;
   bool _isSavingAction = false;
+
+  bool get _usesFolderSelection =>
+      widget.photoLibraryService is WindowsFolderPhotoLibraryService;
+
+  String get _emptyStateMessage {
+    if (_permission == PhotoPermissionResult.limited) {
+      return '当前只授权了部分照片，但没有可显示的图片。';
+    }
+    if (_usesFolderSelection) {
+      return '所选文件夹里没有找到可显示的图片。';
+    }
+    return '相册里暂时没有找到图片。';
+  }
 
   @override
   void initState() {
@@ -65,15 +84,16 @@ class _MemoryCardScreenState extends State<MemoryCardScreen> {
                 showProgress: true,
               ),
             MemoryCardState.permissionDenied => _PermissionDeniedView(
+                permission: _permission,
                 onRetry: _loadLibrary,
                 onOpenSettings: widget.photoLibraryService.openSettings,
               ),
             MemoryCardState.empty => _CenteredMessage(
                 icon: Icons.image_not_supported_outlined,
                 title: '没有可用照片',
-                message: _permission == PhotoPermissionResult.limited
-                    ? '当前只授权了部分照片，但没有可显示的图片。'
-                    : '相册里暂时没有找到图片。',
+                message: _emptyStateMessage,
+                actionLabel: _usesFolderSelection ? '重新选择文件夹' : null,
+                onAction: _usesFolderSelection ? _changePhotoSource : null,
               ),
             MemoryCardState.thumbnailFailed => _CenteredMessage(
                 icon: Icons.broken_image_outlined,
@@ -131,6 +151,7 @@ class _MemoryCardScreenState extends State<MemoryCardScreen> {
       }
 
       _assets = assets;
+      await _refreshProcessedAssetIds();
       await _pickRandomPhoto();
     } catch (error) {
       if (!mounted) {
@@ -141,6 +162,11 @@ class _MemoryCardScreenState extends State<MemoryCardScreen> {
         _state = MemoryCardState.thumbnailFailed;
       });
     }
+  }
+
+  Future<void> _changePhotoSource() async {
+    await widget.photoLibraryService.openSettings();
+    await _loadLibrary();
   }
 
   Future<void> _pickRandomPhoto() async {
@@ -158,7 +184,18 @@ class _MemoryCardScreenState extends State<MemoryCardScreen> {
       _isSavingAction = false;
     });
 
-    final asset = _assets[widget.random.nextInt(_assets.length)];
+    final asset = widget.weightedRandomService.pickPhoto(
+      _assets,
+      processedAssetIds: _processedAssetIds,
+      random: widget.random,
+    );
+    if (asset == null) {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _state = MemoryCardState.empty);
+      return;
+    }
     try {
       final thumbnail =
           await widget.photoLibraryService.getThumbnail(asset.assetId);
@@ -209,6 +246,7 @@ class _MemoryCardScreenState extends State<MemoryCardScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${action.confirmationText}，已保存')),
       );
+      await _refreshProcessedAssetIds();
       await _pickRandomPhoto();
     } catch (error) {
       if (!mounted) {
@@ -241,7 +279,19 @@ class _MemoryCardScreenState extends State<MemoryCardScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('录音已保存')),
     );
+    await _refreshProcessedAssetIds();
     await _pickRandomPhoto();
+  }
+
+  Future<void> _refreshProcessedAssetIds() async {
+    final loader = widget.processedAssetIdsLoader;
+    if (loader != null) {
+      _processedAssetIds = await loader();
+      return;
+    }
+
+    final records = await widget.memoryRepository.getAll();
+    _processedAssetIds = records.map((record) => record.assetId).toSet();
   }
 }
 
@@ -348,23 +398,28 @@ class _LoadedPhotoView extends StatelessWidget {
 
 class _PermissionDeniedView extends StatelessWidget {
   const _PermissionDeniedView({
+    required this.permission,
     required this.onRetry,
     required this.onOpenSettings,
   });
 
+  final PhotoPermissionResult? permission;
   final VoidCallback onRetry;
   final VoidCallback onOpenSettings;
 
   @override
   Widget build(BuildContext context) {
+    final folderRequired = permission?.requiresFolderSelection ?? false;
     return _CenteredMessage(
-      icon: Icons.lock_outline,
-      title: '需要相册权限',
-      message: 'Memory Cards 只读取本地照片缩略图和拍摄时间，用来展示记忆卡。',
-      actionLabel: '重新请求',
+      icon: folderRequired ? Icons.folder_open_outlined : Icons.lock_outline,
+      title: folderRequired ? '请选择照片文件夹' : '需要相册权限',
+      message: folderRequired
+          ? 'Memory Cards 会只读扫描你选择的本地文件夹，不复制、修改、删除或上传照片。'
+          : 'Memory Cards 只读取本地照片缩略图和拍摄时间，用来展示记忆卡。',
+      actionLabel: folderRequired ? '选择文件夹' : '重新请求',
       onAction: onRetry,
-      secondaryActionLabel: '打开设置',
-      onSecondaryAction: onOpenSettings,
+      secondaryActionLabel: folderRequired ? null : '打开设置',
+      onSecondaryAction: folderRequired ? null : onOpenSettings,
     );
   }
 }

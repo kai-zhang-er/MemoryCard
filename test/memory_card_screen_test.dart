@@ -10,6 +10,7 @@ import 'package:memory_cards/screens/memory_card_screen.dart';
 import 'package:memory_cards/services/memory_repository.dart';
 import 'package:memory_cards/services/photo_library_service.dart';
 import 'package:memory_cards/services/recording_service.dart';
+import 'package:memory_cards/services/weighted_random_service.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 void main() {
@@ -22,7 +23,7 @@ void main() {
     TestWidgetsFlutterBinding.ensureInitialized();
     tempDir = await Directory.systemTemp.createTemp('memory_cards_card_test_');
     repository = MemoryRepository(
-      databaseFactory: databaseFactoryFfi,
+      databaseFactory: databaseFactoryFfiNoIsolate,
       databasePath: '${tempDir.path}/memory_cards_test.db',
     );
   });
@@ -100,6 +101,8 @@ Future<void> _pumpCard(
   _FakePhotoLibraryService service,
   MemoryRepository repository, {
   Random? random,
+  WeightedRandomService weightedRandomService = const WeightedRandomService(),
+  bool useRepositoryProcessedIds = false,
 }) async {
   await tester.pumpWidget(
     MaterialApp(
@@ -107,11 +110,23 @@ Future<void> _pumpCard(
         photoLibraryService: service,
         memoryRepository: repository,
         recordingServiceFactory: () => _FakeRecordingService(),
+        processedAssetIdsLoader:
+            useRepositoryProcessedIds ? null : () async => <String>{},
+        weightedRandomService: weightedRandomService,
         random: random ?? Random(1),
       ),
     ),
   );
-  await tester.pumpAndSettle();
+  await _pumpUntilTextGone(tester, '正在读取本地照片');
+}
+
+Future<void> _pumpUntilTextGone(WidgetTester tester, String text) async {
+  for (var i = 0; i < 40; i += 1) {
+    await tester.pump(const Duration(milliseconds: 100));
+    if (find.text(text).evaluate().isEmpty) {
+      return;
+    }
+  }
 }
 
 PhotoAsset _asset(String id) {
