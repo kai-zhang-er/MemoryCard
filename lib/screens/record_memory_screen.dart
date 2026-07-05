@@ -8,6 +8,7 @@ import '../services/memory_action_service.dart';
 import '../services/memory_repository.dart';
 import '../services/recording_service.dart';
 import '../utils/date_utils.dart';
+import '../widgets/adaptive_photo_card.dart';
 
 class RecordMemoryScreen extends StatefulWidget {
   const RecordMemoryScreen({
@@ -53,22 +54,12 @@ class _RecordMemoryScreenState extends State<RecordMemoryScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (widget.thumbnailBytes != null) ...[
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 360),
-                    child: AspectRatio(
-                      aspectRatio: 16 / 9,
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: ColoredBox(
-                          color: Colors.black,
-                          child: Image.memory(
-                            widget.thumbnailBytes!,
-                            fit: BoxFit.contain,
-                            gaplessPlayback: true,
-                          ),
-                        ),
-                      ),
-                    ),
+                  AdaptivePhotoCard(
+                    imageBytes: widget.thumbnailBytes!,
+                    imageWidth: widget.asset.width,
+                    imageHeight: widget.asset.height,
+                    maxDesktopWidth: 360,
+                    maxHeightFactor: 0.28,
                   ),
                   const SizedBox(height: 16),
                 ],

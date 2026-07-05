@@ -11,7 +11,7 @@ import '../services/recording_service.dart';
 import '../services/weighted_random_service.dart';
 import '../utils/date_utils.dart';
 import '../widgets/action_buttons.dart';
-import '../widgets/photo_card.dart';
+import '../widgets/adaptive_photo_card.dart';
 import 'record_memory_screen.dart';
 
 class MemoryCardScreen extends StatefulWidget {
@@ -330,74 +330,78 @@ class _LoadedPhotoView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final actionHandler = isSavingAction ? null : onTalk;
-    return ListView(
-      children: [
-        PhotoCard(
-          child: ColoredBox(
-            color: Colors.black,
-            child: Center(
-              child: Image.memory(
-                thumbnailBytes,
-                fit: BoxFit.contain,
-                gaplessPlayback: true,
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        Text(
-          promptQuestion,
-          style: Theme.of(context).textTheme.titleLarge,
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 8),
-        Text(
-          '拍摄时间：${formatNullableDate(asset.createdAt)}',
-          textAlign: TextAlign.center,
-        ),
-        if (asset.title != null && asset.title!.isNotEmpty) ...[
-          const SizedBox(height: 4),
-          Text(
-            asset.title!,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-        ],
-        const SizedBox(height: 20),
-        ActionButtons(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final windowHeight = MediaQuery.sizeOf(context).height;
+        final availableHeight = constraints.maxHeight.isFinite
+            ? constraints.maxHeight
+            : windowHeight;
+        final maxPhotoHeight = availableHeight * 0.56;
+
+        return ListView(
           children: [
-            FilledButton.icon(
-              onPressed: actionHandler,
-              icon: const Icon(Icons.mic_none),
-              label: const Text('讲讲'),
+            AdaptivePhotoCard(
+              imageBytes: thumbnailBytes,
+              imageWidth: asset.width,
+              imageHeight: asset.height,
+              maxHeight: maxPhotoHeight,
             ),
-            OutlinedButton.icon(
-              onPressed: isSavingAction ? null : onMarkImportant,
-              icon: const Icon(Icons.star_outline),
-              label: const Text('重要'),
+            const SizedBox(height: 16),
+            Text(
+              promptQuestion,
+              style: Theme.of(context).textTheme.titleLarge,
+              textAlign: TextAlign.center,
             ),
-            OutlinedButton.icon(
-              onPressed: isSavingAction ? null : onMarkDeleteCandidate,
-              icon: const Icon(Icons.delete_outline),
-              label: const Text('待删除'),
+            const SizedBox(height: 8),
+            Text(
+              '拍摄时间：${formatNullableDate(asset.createdAt)}',
+              textAlign: TextAlign.center,
             ),
-            TextButton.icon(
-              onPressed: isSavingAction ? null : onSkip,
-              icon: const Icon(Icons.skip_next),
-              label: const Text('跳过'),
+            if (asset.title != null && asset.title!.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                asset.title!,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+            const SizedBox(height: 20),
+            ActionButtons(
+              children: [
+                FilledButton.icon(
+                  onPressed: actionHandler,
+                  icon: const Icon(Icons.mic_none),
+                  label: const Text('讲讲'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: isSavingAction ? null : onMarkImportant,
+                  icon: const Icon(Icons.star_outline),
+                  label: const Text('重要'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: isSavingAction ? null : onMarkDeleteCandidate,
+                  icon: const Icon(Icons.delete_outline),
+                  label: const Text('待删除'),
+                ),
+                TextButton.icon(
+                  onPressed: isSavingAction ? null : onSkip,
+                  icon: const Icon(Icons.skip_next),
+                  label: const Text('跳过'),
+                ),
+              ],
+            ),
+            if (isSavingAction) ...[
+              const SizedBox(height: 16),
+              const Center(child: CircularProgressIndicator()),
+            ],
+            const SizedBox(height: 12),
+            Text(
+              isLimited ? '当前是有限相册授权，只会显示你允许访问的照片。' : '照片只读显示，不会复制、修改、删除或上传。',
+              textAlign: TextAlign.center,
             ),
           ],
-        ),
-        if (isSavingAction) ...[
-          const SizedBox(height: 16),
-          const Center(child: CircularProgressIndicator()),
-        ],
-        const SizedBox(height: 12),
-        Text(
-          isLimited ? '当前是有限相册授权，只会显示你允许访问的照片。' : '照片只读显示，不会复制、修改、删除或上传。',
-          textAlign: TextAlign.center,
-        ),
-      ],
+        );
+      },
     );
   }
 }
