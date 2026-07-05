@@ -8,6 +8,7 @@ import '../utils/date_utils.dart';
 import '../widgets/audio_player_tile.dart';
 import '../widgets/memory_thumbnail.dart';
 import '../widgets/record_status_chips.dart';
+import 'memory_detail_screen.dart';
 
 class MemoryListScreen extends StatefulWidget {
   const MemoryListScreen({
@@ -47,13 +48,15 @@ class _MemoryListScreenState extends State<MemoryListScreen> {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
-            return Center(child: Text('读取失败：${snapshot.error}'));
+            return Center(
+                child: Text('\u8bfb\u53d6\u5931\u8d25\uff1a${snapshot.error}'));
           }
 
           final records = snapshot.data ?? const <MemoryRecord>[];
           if (records.isEmpty) {
             return const Center(
-              child: Text('还没有记录。回到首页开始一局，或添加一条假记忆验证数据库。'),
+              child: Text(
+                  '\u8fd8\u6ca1\u6709\u8bb0\u5fc6\u8bb0\u5f55\u3002\u56de\u5230\u9996\u9875\u5f00\u59cb\u4e00\u5c40\u5427\u3002'),
             );
           }
 
@@ -67,19 +70,22 @@ class _MemoryListScreenState extends State<MemoryListScreen> {
                 final record = records[index];
                 return Card(
                   child: ListTile(
+                    onTap: () => _openDetail(record),
                     leading: MemoryThumbnail(
                       assetId: record.assetId,
                       photoLibraryService: widget.photoLibraryService,
                     ),
-                    title: const Text('照片记忆'),
+                    title: const Text('\u7167\u7247\u8bb0\u5fc6'),
                     subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const SizedBox(height: 8),
-                        Text('拍摄时间: ${formatNullableDate(record.photoTime)}'),
+                        Text(
+                            '\u62cd\u6444\u65f6\u95f4: ${formatNullableDate(record.photoTime)}'),
                         Text('Asset ID: ${record.assetId}'),
                         Text('Memory ID: ${record.memoryId}'),
-                        Text('更新时间: ${record.updatedAt.toLocal()}'),
+                        Text(
+                            '\u66f4\u65b0\u65f6\u95f4: ${record.updatedAt.toLocal()}'),
                         const SizedBox(height: 8),
                         RecordStatusChips(record: record),
                         if (record.audioPath != null &&
@@ -116,12 +122,29 @@ class _MemoryListScreenState extends State<MemoryListScreen> {
     });
     await _recordsFuture;
   }
+
+  Future<void> _openDetail(MemoryRecord record) async {
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (context) => MemoryDetailScreen(
+          initialRecord: record,
+          repository: widget.repository,
+          photoLibraryService: widget.photoLibraryService,
+          audioPlaybackControllerFactory: widget.audioPlaybackControllerFactory,
+        ),
+      ),
+    );
+    if (!mounted) {
+      return;
+    }
+    await _refresh();
+  }
 }
 
 enum MemoryListFilter {
-  all('记忆列表'),
-  important('重要照片'),
-  deleteCandidates('待删除');
+  all('\u8bb0\u5fc6\u5217\u8868'),
+  important('\u91cd\u8981\u7167\u7247'),
+  deleteCandidates('\u5f85\u5220\u9664');
 
   const MemoryListFilter(this.title);
 

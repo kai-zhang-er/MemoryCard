@@ -58,6 +58,8 @@ class MemoryRepository {
     return rows.map(MemoryRecord.fromMap).toList(growable: false);
   }
 
+  Future<MemoryRecord?> getByMemoryId(String memoryId) => getById(memoryId);
+
   Future<MemoryRecord?> getById(String memoryId) async {
     final db = await database;
     final rows = await db.query(
@@ -104,6 +106,8 @@ class MemoryRepository {
       whereArgs: [record.memoryId],
     );
   }
+
+  Future<int> deleteByMemoryId(String memoryId) => deleteById(memoryId);
 
   Future<int> deleteById(String memoryId) async {
     final db = await database;

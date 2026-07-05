@@ -77,13 +77,17 @@ class _AudioPlayerTileState extends State<AudioPlayerTile> {
           Row(
             children: [
               IconButton.filledTonal(
-                tooltip: _isPlaying ? '暂停录音' : '播放录音',
+                tooltip: _isPlaying
+                    ? '\u6682\u505c\u5f55\u97f3'
+                    : '\u64ad\u653e\u5f55\u97f3',
                 onPressed: _isBusy ? null : _togglePlayback,
                 icon: Icon(_isPlaying ? Icons.pause : Icons.play_arrow),
               ),
               const SizedBox(width: 8),
               Text(
-                _isPlaying ? '正在播放录音' : '播放录音',
+                _isPlaying
+                    ? '\u6b63\u5728\u64ad\u653e\u5f55\u97f3'
+                    : '\u64ad\u653e\u5f55\u97f3',
                 style: theme.textTheme.bodyMedium,
               ),
               const SizedBox(width: 12),

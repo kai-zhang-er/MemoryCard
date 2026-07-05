@@ -13,6 +13,11 @@ import 'package:memory_cards/services/photo_library_service.dart';
 import 'package:memory_cards/widgets/audio_player_tile.dart';
 import 'package:memory_cards/widgets/memory_thumbnail.dart';
 
+const _playAudioText = '\u64ad\u653e\u5f55\u97f3';
+const _photoMemoryText = '\u7167\u7247\u8bb0\u5fc6';
+const _detailTitle = '\u8bb0\u5fc6\u8be6\u60c5';
+const _listTitle = '\u8bb0\u5fc6\u5217\u8868';
+
 void main() {
   testWidgets('MemoryListScreen shows thumbnails and audio playback controls',
       (tester) async {
@@ -24,27 +29,61 @@ void main() {
       _record('memory_without_audio'),
     ]);
 
-    await tester.pumpWidget(
-      MaterialApp(
-        home: MemoryListScreen(
-          repository: repository,
-          filter: MemoryListFilter.all,
-          photoLibraryService: photoLibraryService,
-          audioPlaybackControllerFactory: _FakeAudioPlaybackController.new,
-        ),
-      ),
+    await _pumpList(
+      tester,
+      repository: repository,
+      photoLibraryService: photoLibraryService,
     );
     await tester.pump();
     await tester.pump();
 
     expect(find.byType(MemoryThumbnail), findsNWidgets(2));
     expect(find.byType(AudioPlayerTile), findsOneWidget);
-    expect(find.text('播放录音'), findsOneWidget);
+    expect(find.text(_playAudioText), findsOneWidget);
     expect(
       photoLibraryService.thumbnailRequests,
       containsAll(['asset_memory_with_audio', 'asset_memory_without_audio']),
     );
   });
+
+  testWidgets(
+      'tapping a memory opens the detail screen and refreshes on return',
+      (tester) async {
+    final repository = _FakeMemoryRepository([_record('memory_001')]);
+
+    await _pumpList(tester, repository: repository);
+    await tester.pump();
+
+    await tester.tap(find.text(_photoMemoryText));
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text(_detailTitle), findsOneWidget);
+
+    await tester.pageBack();
+    await tester.pump();
+    await tester.pump();
+
+    expect(repository.getAllCalls, 2);
+    expect(find.text(_listTitle), findsOneWidget);
+  });
+}
+
+Future<void> _pumpList(
+  WidgetTester tester, {
+  required _FakeMemoryRepository repository,
+  PhotoLibraryService? photoLibraryService,
+}) async {
+  await tester.pumpWidget(
+    MaterialApp(
+      home: MemoryListScreen(
+        repository: repository,
+        filter: MemoryListFilter.all,
+        photoLibraryService: photoLibraryService ?? _FakePhotoLibraryService(),
+        audioPlaybackControllerFactory: _FakeAudioPlaybackController.new,
+      ),
+    ),
+  );
 }
 
 MemoryRecord _record(String id) {
@@ -62,9 +101,13 @@ class _FakeMemoryRepository extends MemoryRepository {
   _FakeMemoryRepository(this.records);
 
   final List<MemoryRecord> records;
+  var getAllCalls = 0;
 
   @override
-  Future<List<MemoryRecord>> getAll() async => records;
+  Future<List<MemoryRecord>> getAll() async {
+    getAllCalls += 1;
+    return records;
+  }
 
   @override
   Future<List<MemoryRecord>> getImportant() async =>
@@ -73,6 +116,33 @@ class _FakeMemoryRepository extends MemoryRepository {
   @override
   Future<List<MemoryRecord>> getDeleteCandidates() async =>
       records.where((record) => record.deleteCandidate).toList(growable: false);
+
+  @override
+  Future<MemoryRecord?> getByMemoryId(String memoryId) async {
+    for (final record in records) {
+      if (record.memoryId == memoryId) {
+        return record;
+      }
+    }
+    return null;
+  }
+
+  @override
+  Future<void> upsert(MemoryRecord record) async {
+    final index =
+        records.indexWhere((item) => item.memoryId == record.memoryId);
+    if (index == -1) {
+      records.add(record);
+    } else {
+      records[index] = record;
+    }
+  }
+
+  @override
+  Future<int> deleteByMemoryId(String memoryId) async {
+    records.removeWhere((record) => record.memoryId == memoryId);
+    return 1;
+  }
 }
 
 class _FakePhotoLibraryService implements PhotoLibraryService {
