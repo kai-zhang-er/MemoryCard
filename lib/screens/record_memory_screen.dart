@@ -16,12 +16,14 @@ class RecordMemoryScreen extends StatefulWidget {
     required this.asset,
     required this.memoryRepository,
     required this.recordingService,
+    required this.promptQuestion,
     this.thumbnailBytes,
   });
 
   final PhotoAsset asset;
   final MemoryRepository memoryRepository;
   final RecordingService recordingService;
+  final String promptQuestion;
   final Uint8List? thumbnailBytes;
 
   @override
@@ -69,6 +71,12 @@ class _RecordMemoryScreenState extends State<RecordMemoryScreen> {
                   _state.title,
                   style: Theme.of(context).textTheme.titleLarge,
                   textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  widget.promptQuestion,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -254,6 +262,7 @@ class _RecordMemoryScreenState extends State<RecordMemoryScreen> {
       await MemoryActionService(widget.memoryRepository).attachAudio(
         widget.asset,
         path,
+        promptQuestion: widget.promptQuestion,
       );
       if (!mounted) {
         return;

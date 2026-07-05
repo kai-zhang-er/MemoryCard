@@ -1,42 +1,20 @@
 import 'dart:convert';
-import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:memory_cards/models/memory_record.dart';
 import 'package:memory_cards/models/photo_asset.dart';
 import 'package:memory_cards/screens/record_memory_screen.dart';
 import 'package:memory_cards/services/memory_repository.dart';
 import 'package:memory_cards/services/recording_service.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 void main() {
-  sqfliteFfiInit();
-
-  late Directory tempDir;
-  late MemoryRepository repository;
-
-  setUp(() async {
-    tempDir =
-        await Directory.systemTemp.createTemp('memory_cards_record_test_');
-    repository = MemoryRepository(
-      databaseFactory: databaseFactoryFfi,
-      databasePath: '${tempDir.path}/memory_cards_test.db',
-    );
-  });
-
-  tearDown(() async {
-    await repository.close();
-    if (await tempDir.exists()) {
-      await tempDir.delete(recursive: true);
-    }
-  });
-
   testWidgets('shows denied state when microphone permission is missing',
       (tester) async {
     final service = _FakeRecordingService(hasPermissionValue: false);
 
-    await _pumpScreen(tester, service, repository);
+    await _pumpScreen(tester, service, _FakeMemoryRepository());
     await tester.tap(find.text('开始录音'));
     await tester.pump();
 
@@ -51,19 +29,40 @@ void main() {
     await _pumpScreen(
       tester,
       service,
-      repository,
+      _FakeMemoryRepository(),
       thumbnailBytes: _onePixelPng,
     );
 
     expect(find.byType(Image), findsOneWidget);
   });
-  testWidgets('discarding recording does not write record', (tester) async {
+
+  testWidgets('saving recording stores the shown prompt', (tester) async {
+    final repository = _FakeMemoryRepository();
     final service = _FakeRecordingService(
       hasPermissionValue: true,
       stopPath: 'audio/2026/memory_photo_001.m4a',
     );
 
     await _pumpScreen(tester, service, repository);
+    await tester.tap(find.text('开始录音'));
+    await tester.pump();
+    await tester.tap(find.text('停止录音'));
+    await tester.pump();
+    await tester.tap(find.text('保存'));
+    await tester.pump();
+
+    final saved = await repository.getByAssetId('photo_001');
+    expect(saved, isNotNull);
+    expect(saved!.promptQuestion, '这是在哪里？');
+  });
+
+  testWidgets('discarding recording does not write record', (tester) async {
+    final service = _FakeRecordingService(
+      hasPermissionValue: true,
+      stopPath: 'audio/2026/memory_photo_001.m4a',
+    );
+
+    await _pumpScreen(tester, service, _FakeMemoryRepository());
     await tester.tap(find.text('开始录音'));
     await tester.pump();
     await tester.tap(find.text('停止录音'));
@@ -87,6 +86,7 @@ Future<void> _pumpScreen(
         memoryRepository: repository,
         recordingService: recordingService,
         thumbnailBytes: thumbnailBytes,
+        promptQuestion: '这是在哪里？',
       ),
     ),
   );
@@ -101,6 +101,22 @@ PhotoAsset _asset(String id) {
     height: 1600,
     title: 'Fake photo $id',
   );
+}
+
+class _FakeMemoryRepository extends MemoryRepository {
+  final List<MemoryRecord> records = [];
+
+  @override
+  Future<void> upsert(MemoryRecord record) async {
+    records.removeWhere((existing) => existing.memoryId == record.memoryId);
+    records.add(record);
+  }
+
+  @override
+  Future<MemoryRecord?> getByAssetId(String assetId) async {
+    final matches = records.where((record) => record.assetId == assetId);
+    return matches.isEmpty ? null : matches.last;
+  }
 }
 
 class _FakeRecordingService implements RecordingService {

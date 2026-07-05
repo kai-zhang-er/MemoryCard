@@ -10,6 +10,7 @@ import 'package:memory_cards/screens/memory_card_screen.dart';
 import 'package:memory_cards/screens/record_memory_screen.dart';
 import 'package:memory_cards/services/memory_repository.dart';
 import 'package:memory_cards/services/photo_library_service.dart';
+import 'package:memory_cards/services/prompt_question_service.dart';
 import 'package:memory_cards/services/recording_service.dart';
 import 'package:memory_cards/services/weighted_random_service.dart';
 
@@ -38,7 +39,7 @@ void main() {
     expect(find.byIcon(Icons.image_not_supported_outlined), findsOneWidget);
   });
 
-  testWidgets('shows a local photo thumbnail', (tester) async {
+  testWidgets('shows a local photo thumbnail and prompt', (tester) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
     final service = _FakePhotoLibraryService(
       permission: PhotoPermissionResult.authorized,
@@ -49,12 +50,63 @@ void main() {
     await _pumpCard(tester, service, _FakeMemoryRepository());
 
     expect(find.byType(Image), findsOneWidget);
+    expect(find.text('测试问题？'), findsOneWidget);
     expect(find.byIcon(Icons.star_outline), findsOneWidget);
     expect(find.byIcon(Icons.delete_outline), findsOneWidget);
     expect(find.byIcon(Icons.skip_next), findsOneWidget);
   });
 
-  testWidgets('talk opens recording screen with the current thumbnail',
+  testWidgets('quick tag chips toggle and save without advancing',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    final repository = _FakeMemoryRepository();
+    final service = _FakePhotoLibraryService(
+      permission: PhotoPermissionResult.authorized,
+      assets: [_asset('photo_001'), _asset('photo_002')],
+      thumbnails: {
+        'photo_001': _onePixelPng,
+        'photo_002': _onePixelPng,
+      },
+    );
+
+    await _pumpCard(tester, service, repository);
+    final firstShown = service.thumbnailRequests.single;
+
+    await tester.tap(find.text('旅行'));
+    await tester.pump();
+    await tester.tap(find.text('家人'));
+    await tester.pump();
+    await tester.tap(find.text('保存标签'));
+    await _pumpSeveral(tester);
+
+    final saved = await repository.getByAssetId(firstShown);
+    expect(saved, isNotNull);
+    expect(saved!.userTags, ['旅行', '家人']);
+    expect(saved.promptQuestion, '测试问题？');
+    expect(service.thumbnailRequests, [firstShown]);
+  });
+
+  testWidgets('important action saves the displayed prompt', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    final repository = _FakeMemoryRepository();
+    final service = _FakePhotoLibraryService(
+      permission: PhotoPermissionResult.authorized,
+      assets: [_asset('photo_001')],
+      thumbnails: {'photo_001': _onePixelPng},
+    );
+
+    await _pumpCard(tester, service, repository);
+    await _tapVisible(tester, find.byIcon(Icons.star_outline));
+    await _pumpSeveral(tester);
+
+    final saved = await repository.getByAssetId('photo_001');
+    expect(saved, isNotNull);
+    expect(saved!.important, isTrue);
+    expect(saved.promptQuestion, '测试问题？');
+  });
+
+  testWidgets(
+      'talk opens recording screen with the current prompt and thumbnail',
       (tester) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
     final service = _FakePhotoLibraryService(
@@ -64,10 +116,11 @@ void main() {
     );
 
     await _pumpCard(tester, service, _FakeMemoryRepository());
-    await tester.tap(find.byIcon(Icons.mic_none));
+    await _tapVisible(tester, find.byIcon(Icons.mic_none));
     await _pumpSeveral(tester);
 
     expect(find.byType(RecordMemoryScreen), findsOneWidget);
+    expect(find.text('测试问题？'), findsOneWidget);
     expect(find.byType(Image), findsWidgets);
   });
 
@@ -87,7 +140,7 @@ void main() {
     await _pumpCard(tester, service, repository);
     final firstShown = service.thumbnailRequests.single;
 
-    await tester.tap(find.byIcon(Icons.skip_next));
+    await _tapVisible(tester, find.byIcon(Icons.skip_next));
     await _pumpSeveral(tester);
 
     expect(service.thumbnailRequests, hasLength(2));
@@ -125,7 +178,7 @@ void main() {
     expect(service.thumbnailRequests, ['photo_002']);
   });
 
-  testWidgets('today five stops after five shown photos', (tester) async {
+  testWidgets('today five completion shows session counters', (tester) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
     final repository = _FakeMemoryRepository();
     final assets = List.generate(6, (index) => _asset('photo_$index'));
@@ -143,13 +196,29 @@ void main() {
       repository,
       sessionLimit: 5,
     );
-    for (var i = 0; i < 5; i += 1) {
-      await tester.tap(find.byIcon(Icons.skip_next));
-      await _pumpSeveral(tester);
-    }
+    await tester.tap(find.text('旅行'));
+    await tester.pump();
+    await tester.tap(find.text('保存标签'));
+    await _pumpSeveral(tester);
+    await _tapVisible(tester, find.byIcon(Icons.star_outline));
+    await _pumpSeveral(tester);
+    await _tapVisible(tester, find.byIcon(Icons.delete_outline));
+    await _pumpSeveral(tester);
+    await _tapVisible(tester, find.byIcon(Icons.skip_next));
+    await _pumpSeveral(tester);
+    await _tapVisible(tester, find.byIcon(Icons.skip_next));
+    await _pumpSeveral(tester);
+    await _tapVisible(tester, find.byIcon(Icons.skip_next));
+    await _pumpSeveral(tester);
 
     expect(service.thumbnailRequests.toSet(), hasLength(5));
     expect(find.byIcon(Icons.check_circle_outline), findsOneWidget);
+    expect(find.text('看过 5 张'), findsOneWidget);
+    expect(find.text('录音 0 段'), findsOneWidget);
+    expect(find.text('重要 1 张'), findsOneWidget);
+    expect(find.text('待删除 1 张'), findsOneWidget);
+    expect(find.text('跳过 3 张'), findsOneWidget);
+    expect(find.text('标签 1 张'), findsOneWidget);
   });
 }
 
@@ -159,6 +228,8 @@ Future<void> _pumpCard(
   MemoryRepository repository, {
   Random? random,
   WeightedRandomService weightedRandomService = const WeightedRandomService(),
+  PromptQuestionService promptQuestionService =
+      const PromptQuestionService(questions: ['测试问题？']),
   bool useRepositoryProcessedIds = false,
   int? sessionLimit,
 }) async {
@@ -172,11 +243,18 @@ Future<void> _pumpCard(
         processedAssetIdsLoader:
             useRepositoryProcessedIds ? null : () async => <String>{},
         weightedRandomService: weightedRandomService,
+        promptQuestionService: promptQuestionService,
         random: random ?? Random(1),
       ),
     ),
   );
   await _pumpSeveral(tester);
+}
+
+Future<void> _tapVisible(WidgetTester tester, Finder finder) async {
+  await tester.ensureVisible(finder);
+  await tester.pump();
+  await tester.tap(finder);
 }
 
 Future<void> _pumpSeveral(WidgetTester tester) async {

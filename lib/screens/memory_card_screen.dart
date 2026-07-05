@@ -7,6 +7,7 @@ import '../models/photo_asset.dart';
 import '../services/memory_action_service.dart';
 import '../services/memory_repository.dart';
 import '../services/photo_library_service.dart';
+import '../services/prompt_question_service.dart';
 import '../services/recording_service.dart';
 import '../services/weighted_random_service.dart';
 import '../utils/date_utils.dart';
@@ -23,6 +24,7 @@ class MemoryCardScreen extends StatefulWidget {
     RecordingService Function()? recordingServiceFactory,
     this.processedAssetIdsLoader,
     this.weightedRandomService = const WeightedRandomService(),
+    this.promptQuestionService = const PromptQuestionService(),
     Random? random,
   })  : recordingServiceFactory =
             recordingServiceFactory ?? (() => RecordRecordingService()),
@@ -34,6 +36,7 @@ class MemoryCardScreen extends StatefulWidget {
   final RecordingService Function() recordingServiceFactory;
   final Future<Set<String>> Function()? processedAssetIdsLoader;
   final WeightedRandomService weightedRandomService;
+  final PromptQuestionService promptQuestionService;
   final Random random;
 
   @override
@@ -41,17 +44,32 @@ class MemoryCardScreen extends StatefulWidget {
 }
 
 class _MemoryCardScreenState extends State<MemoryCardScreen> {
-  static const String _promptQuestion = MemoryActionService.promptQuestion;
+  static const List<String> _quickTags = [
+    '旅行',
+    '家人',
+    '朋友',
+    '聚会',
+    '学校',
+    '工作',
+    '日常',
+    '美食',
+    '风景',
+    '不确定',
+  ];
 
   MemoryCardState _state = MemoryCardState.loading;
   PhotoPermissionResult? _permission;
   List<PhotoAsset> _assets = const [];
   Set<String> _processedAssetIds = const {};
   Set<String> _sessionShownAssetIds = const {};
+  Set<String> _selectedTags = const {};
   PhotoAsset? _currentAsset;
   Uint8List? _thumbnailBytes;
+  String? _currentPromptQuestion;
   String? _errorMessage;
   bool _isSavingAction = false;
+  bool _isSavingTags = false;
+  SessionSummary _sessionSummary = const SessionSummary();
 
   bool get _usesFolderSelection =>
       widget.photoLibraryService is WindowsFolderPhotoLibraryService;
@@ -114,12 +132,11 @@ class _MemoryCardScreenState extends State<MemoryCardScreen> {
                 actionLabel: _usesFolderSelection ? '重新选择文件夹' : null,
                 onAction: _usesFolderSelection ? _changePhotoSource : null,
               ),
-            MemoryCardState.sessionComplete => _CenteredMessage(
-                icon: Icons.check_circle_outline,
+            MemoryCardState.sessionComplete => _CompletionView(
                 title: _completionTitle,
                 message: _completionMessage,
-                actionLabel: '返回首页',
-                onAction: () => Navigator.of(context).maybePop(),
+                summary: _sessionSummary,
+                onDone: () => Navigator.of(context).maybePop(),
               ),
             MemoryCardState.thumbnailFailed => _CenteredMessage(
                 icon: Icons.broken_image_outlined,
@@ -133,7 +150,12 @@ class _MemoryCardScreenState extends State<MemoryCardScreen> {
                 thumbnailBytes: _thumbnailBytes!,
                 isLimited: _permission == PhotoPermissionResult.limited,
                 isSavingAction: _isSavingAction,
-                promptQuestion: _promptQuestion,
+                isSavingTags: _isSavingTags,
+                promptQuestion: _currentPromptQuestion!,
+                selectedTags: _selectedTags,
+                quickTags: _quickTags,
+                onTagSelected: _toggleTag,
+                onSaveTags: _saveSelectedTags,
                 onTalk: _openRecordPlaceholder,
                 onMarkImportant: () =>
                     _saveAction(MemoryRecordAction.important),
@@ -152,6 +174,8 @@ class _MemoryCardScreenState extends State<MemoryCardScreen> {
       _state = MemoryCardState.loading;
       _errorMessage = null;
       _sessionShownAssetIds = const {};
+      _selectedTags = const {};
+      _sessionSummary = const SessionSummary();
     });
 
     try {
@@ -206,15 +230,7 @@ class _MemoryCardScreenState extends State<MemoryCardScreen> {
     }
 
     if (_hasReachedSessionLimit) {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _currentAsset = null;
-        _thumbnailBytes = null;
-        _isSavingAction = false;
-        _state = MemoryCardState.sessionComplete;
-      });
+      _completeSession();
       return;
     }
 
@@ -226,15 +242,7 @@ class _MemoryCardScreenState extends State<MemoryCardScreen> {
         .where((asset) => !excludedAssetIds.contains(asset.assetId))
         .toList(growable: false);
     if (candidates.isEmpty) {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _currentAsset = null;
-        _thumbnailBytes = null;
-        _isSavingAction = false;
-        _state = MemoryCardState.sessionComplete;
-      });
+      _completeSession();
       return;
     }
 
@@ -242,6 +250,7 @@ class _MemoryCardScreenState extends State<MemoryCardScreen> {
       _state = MemoryCardState.loading;
       _errorMessage = null;
       _isSavingAction = false;
+      _isSavingTags = false;
     });
 
     final asset = widget.weightedRandomService.pickPhoto(
@@ -249,12 +258,10 @@ class _MemoryCardScreenState extends State<MemoryCardScreen> {
       random: widget.random,
     );
     if (asset == null) {
-      if (!mounted) {
-        return;
-      }
-      setState(() => _state = MemoryCardState.sessionComplete);
+      _completeSession();
       return;
     }
+
     try {
       final thumbnail =
           await widget.photoLibraryService.getThumbnail(asset.assetId);
@@ -274,10 +281,18 @@ class _MemoryCardScreenState extends State<MemoryCardScreen> {
       setState(() {
         _currentAsset = asset;
         _thumbnailBytes = thumbnail;
+        _currentPromptQuestion = widget.promptQuestionService.questionForPhoto(
+          asset.assetId,
+          random: widget.random,
+        );
+        _selectedTags = const {};
         _sessionShownAssetIds = {
           ..._sessionShownAssetIds,
           asset.assetId,
         };
+        _sessionSummary = _sessionSummary.copyWith(
+          shownCount: _sessionSummary.shownCount + 1,
+        );
         _state = MemoryCardState.loaded;
       });
     } catch (error) {
@@ -293,19 +308,50 @@ class _MemoryCardScreenState extends State<MemoryCardScreen> {
     }
   }
 
+  void _completeSession() {
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _currentAsset = null;
+      _thumbnailBytes = null;
+      _selectedTags = const {};
+      _isSavingAction = false;
+      _isSavingTags = false;
+      _state = MemoryCardState.sessionComplete;
+    });
+  }
+
   Future<void> _saveAction(MemoryRecordAction action) async {
     final asset = _currentAsset;
-    if (asset == null || _isSavingAction) {
+    final promptQuestion = _currentPromptQuestion;
+    if (asset == null || promptQuestion == null || _isSavingAction) {
       return;
     }
 
     setState(() => _isSavingAction = true);
     try {
-      await MemoryActionService(widget.memoryRepository)
-          .saveAction(asset, action);
+      await MemoryActionService(widget.memoryRepository).saveAction(
+        asset,
+        action,
+        promptQuestion: promptQuestion,
+      );
       if (!mounted) {
         return;
       }
+      setState(() {
+        _sessionSummary = switch (action) {
+          MemoryRecordAction.important => _sessionSummary.copyWith(
+              importantCount: _sessionSummary.importantCount + 1,
+            ),
+          MemoryRecordAction.deleteCandidate => _sessionSummary.copyWith(
+              deleteCandidateCount: _sessionSummary.deleteCandidateCount + 1,
+            ),
+          MemoryRecordAction.skipped => _sessionSummary.copyWith(
+              skippedCount: _sessionSummary.skippedCount + 1,
+            ),
+        };
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${action.confirmationText}，已保存')),
       );
@@ -322,9 +368,63 @@ class _MemoryCardScreenState extends State<MemoryCardScreen> {
     }
   }
 
+  Future<void> _saveSelectedTags() async {
+    final asset = _currentAsset;
+    final promptQuestion = _currentPromptQuestion;
+    if (asset == null ||
+        promptQuestion == null ||
+        _selectedTags.isEmpty ||
+        _isSavingTags) {
+      return;
+    }
+
+    setState(() => _isSavingTags = true);
+    try {
+      await MemoryActionService(widget.memoryRepository).saveTags(
+        asset,
+        _selectedTags.toList(growable: false),
+        promptQuestion: promptQuestion,
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isSavingTags = false;
+        _sessionSummary = _sessionSummary.copyWith(
+          taggedCount: _sessionSummary.taggedCount + 1,
+        );
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('标签已保存')),
+      );
+      await _refreshProcessedAssetIds();
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _isSavingTags = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('保存标签失败：$error')),
+      );
+    }
+  }
+
+  void _toggleTag(String tag, bool selected) {
+    setState(() {
+      final updated = {..._selectedTags};
+      if (selected) {
+        updated.add(tag);
+      } else {
+        updated.remove(tag);
+      }
+      _selectedTags = updated;
+    });
+  }
+
   Future<void> _openRecordPlaceholder() async {
     final asset = _currentAsset;
-    if (asset == null) {
+    final promptQuestion = _currentPromptQuestion;
+    if (asset == null || promptQuestion == null) {
       return;
     }
     final saved = await Navigator.of(context).push<bool>(
@@ -334,12 +434,18 @@ class _MemoryCardScreenState extends State<MemoryCardScreen> {
           memoryRepository: widget.memoryRepository,
           recordingService: widget.recordingServiceFactory(),
           thumbnailBytes: _thumbnailBytes,
+          promptQuestion: promptQuestion,
         ),
       ),
     );
     if (!mounted || saved != true) {
       return;
     }
+    setState(() {
+      _sessionSummary = _sessionSummary.copyWith(
+        recordedCount: _sessionSummary.recordedCount + 1,
+      );
+    });
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('录音已保存')),
     );
@@ -368,13 +474,54 @@ enum MemoryCardState {
   loaded,
 }
 
+class SessionSummary {
+  const SessionSummary({
+    this.shownCount = 0,
+    this.recordedCount = 0,
+    this.importantCount = 0,
+    this.deleteCandidateCount = 0,
+    this.skippedCount = 0,
+    this.taggedCount = 0,
+  });
+
+  final int shownCount;
+  final int recordedCount;
+  final int importantCount;
+  final int deleteCandidateCount;
+  final int skippedCount;
+  final int taggedCount;
+
+  SessionSummary copyWith({
+    int? shownCount,
+    int? recordedCount,
+    int? importantCount,
+    int? deleteCandidateCount,
+    int? skippedCount,
+    int? taggedCount,
+  }) {
+    return SessionSummary(
+      shownCount: shownCount ?? this.shownCount,
+      recordedCount: recordedCount ?? this.recordedCount,
+      importantCount: importantCount ?? this.importantCount,
+      deleteCandidateCount: deleteCandidateCount ?? this.deleteCandidateCount,
+      skippedCount: skippedCount ?? this.skippedCount,
+      taggedCount: taggedCount ?? this.taggedCount,
+    );
+  }
+}
+
 class _LoadedPhotoView extends StatelessWidget {
   const _LoadedPhotoView({
     required this.asset,
     required this.thumbnailBytes,
     required this.isLimited,
     required this.isSavingAction,
+    required this.isSavingTags,
     required this.promptQuestion,
+    required this.selectedTags,
+    required this.quickTags,
+    required this.onTagSelected,
+    required this.onSaveTags,
     required this.onTalk,
     required this.onMarkImportant,
     required this.onMarkDeleteCandidate,
@@ -385,7 +532,12 @@ class _LoadedPhotoView extends StatelessWidget {
   final Uint8List thumbnailBytes;
   final bool isLimited;
   final bool isSavingAction;
+  final bool isSavingTags;
   final String promptQuestion;
+  final Set<String> selectedTags;
+  final List<String> quickTags;
+  final void Function(String tag, bool selected) onTagSelected;
+  final VoidCallback onSaveTags;
   final VoidCallback onTalk;
   final VoidCallback onMarkImportant;
   final VoidCallback onMarkDeleteCandidate;
@@ -400,7 +552,7 @@ class _LoadedPhotoView extends StatelessWidget {
         final availableHeight = constraints.maxHeight.isFinite
             ? constraints.maxHeight
             : windowHeight;
-        final maxPhotoHeight = availableHeight * 0.56;
+        final maxPhotoHeight = availableHeight * 0.48;
 
         return ListView(
           children: [
@@ -429,6 +581,29 @@ class _LoadedPhotoView extends StatelessWidget {
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ],
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              alignment: WrapAlignment.center,
+              children: [
+                for (final tag in quickTags)
+                  FilterChip(
+                    label: Text(tag),
+                    selected: selectedTags.contains(tag),
+                    onSelected: (selected) => onTagSelected(tag, selected),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Center(
+              child: OutlinedButton.icon(
+                onPressed:
+                    selectedTags.isEmpty || isSavingTags ? null : onSaveTags,
+                icon: const Icon(Icons.sell_outlined),
+                label: Text(isSavingTags ? '保存中...' : '保存标签'),
+              ),
+            ),
             const SizedBox(height: 20),
             ActionButtons(
               children: [
@@ -467,6 +642,72 @@ class _LoadedPhotoView extends StatelessWidget {
         );
       },
     );
+  }
+}
+
+class _CompletionView extends StatelessWidget {
+  const _CompletionView({
+    required this.title,
+    required this.message,
+    required this.summary,
+    required this.onDone,
+  });
+
+  final String title;
+  final String message;
+  final SessionSummary summary;
+  final VoidCallback onDone;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: ListView(
+        shrinkWrap: true,
+        children: [
+          const Icon(Icons.check_circle_outline, size: 48),
+          const SizedBox(height: 16),
+          Text(
+            title,
+            style: Theme.of(context).textTheme.titleLarge,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Text(message, textAlign: TextAlign.center),
+          const SizedBox(height: 20),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            alignment: WrapAlignment.center,
+            children: [
+              _SummaryChip(label: '看过 ${summary.shownCount} 张'),
+              _SummaryChip(label: '录音 ${summary.recordedCount} 段'),
+              _SummaryChip(label: '重要 ${summary.importantCount} 张'),
+              _SummaryChip(label: '待删除 ${summary.deleteCandidateCount} 张'),
+              _SummaryChip(label: '跳过 ${summary.skippedCount} 张'),
+              _SummaryChip(label: '标签 ${summary.taggedCount} 张'),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Center(
+            child: FilledButton(
+              onPressed: onDone,
+              child: const Text('返回首页'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SummaryChip extends StatelessWidget {
+  const _SummaryChip({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Chip(label: Text(label));
   }
 }
 

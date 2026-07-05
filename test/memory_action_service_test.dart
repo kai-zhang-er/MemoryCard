@@ -30,10 +30,12 @@ void main() {
     }
   });
 
-  test('important action creates an important memory record', () async {
+  test('important action creates an important memory record with prompt',
+      () async {
     final record = await service.saveAction(
       _asset('photo_001'),
       MemoryRecordAction.important,
+      promptQuestion: '这是在哪里？',
       now: DateTime.utc(2026, 7, 3),
     );
 
@@ -44,7 +46,7 @@ void main() {
     expect(saved.important, isTrue);
     expect(saved.deleteCandidate, isFalse);
     expect(saved.skipped, isFalse);
-    expect(saved.promptQuestion, MemoryActionService.promptQuestion);
+    expect(saved.promptQuestion, '这是在哪里？');
   });
 
   test('delete candidate action creates a delete candidate record', () async {
@@ -100,10 +102,12 @@ void main() {
     expect(saved.deleteCandidate, isTrue);
     expect(saved.updatedAt, DateTime.utc(2026, 7, 3, 10));
   });
-  test('attaches audio path to a new record', () async {
+
+  test('attaches audio path to a new record with prompt', () async {
     await service.attachAudio(
       _asset('photo_001'),
       'audio/2026/memory_photo_001.m4a',
+      promptQuestion: '这一天后来发生了什么？',
       now: DateTime.utc(2026, 7, 3),
     );
 
@@ -111,6 +115,7 @@ void main() {
 
     expect(saved, isNotNull);
     expect(saved!.audioPath, 'audio/2026/memory_photo_001.m4a');
+    expect(saved.promptQuestion, '这一天后来发生了什么？');
     expect(saved.transcript, '');
     expect(saved.memoryText, '');
     expect(saved.reviewStatus, 'raw');
@@ -135,6 +140,56 @@ void main() {
     expect(saved!.important, isTrue);
     expect(saved.audioPath, 'audio/2026/memory_photo_001.m4a');
     expect(saved.updatedAt, DateTime.utc(2026, 7, 3, 10));
+  });
+
+  test('saving tags creates a record with merged user tags and prompt',
+      () async {
+    final asset = _asset('photo_001');
+    await service.saveTags(
+      asset,
+      ['旅行', '家人'],
+      promptQuestion: '这是在哪里？',
+      now: DateTime.utc(2026, 7, 3, 9),
+    );
+    await service.saveTags(
+      asset,
+      ['家人', '美食'],
+      promptQuestion: '这是在哪里？',
+      now: DateTime.utc(2026, 7, 3, 10),
+    );
+
+    final saved = await repository.getByAssetId('photo_001');
+
+    expect(saved, isNotNull);
+    expect(saved!.userTags, ['旅行', '家人', '美食']);
+    expect(saved.promptQuestion, '这是在哪里？');
+    expect(saved.updatedAt, DateTime.utc(2026, 7, 3, 10));
+  });
+
+  test('saving tags preserves existing flags and audio', () async {
+    final asset = _asset('photo_001');
+    await service.saveAction(
+      asset,
+      MemoryRecordAction.important,
+      now: DateTime.utc(2026, 7, 3, 9),
+    );
+    await service.attachAudio(
+      asset,
+      'audio/2026/memory_photo_001.m4a',
+      now: DateTime.utc(2026, 7, 3, 10),
+    );
+    await service.saveTags(
+      asset,
+      ['朋友'],
+      now: DateTime.utc(2026, 7, 3, 11),
+    );
+
+    final saved = await repository.getByAssetId('photo_001');
+
+    expect(saved, isNotNull);
+    expect(saved!.important, isTrue);
+    expect(saved.audioPath, 'audio/2026/memory_photo_001.m4a');
+    expect(saved.userTags, ['朋友']);
   });
 }
 

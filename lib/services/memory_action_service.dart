@@ -12,26 +12,18 @@ class MemoryActionService {
   Future<MemoryRecord> saveAction(
     PhotoAsset asset,
     MemoryRecordAction action, {
+    String? promptQuestion,
     DateTime? now,
   }) async {
     final timestamp = now ?? DateTime.now();
-    final existing = await repository.getByAssetId(asset.assetId);
-    final base = existing ??
-        MemoryRecord(
-          memoryId: _newMemoryId(asset, timestamp),
-          assetId: asset.assetId,
-          assetFingerprint: _assetFingerprint(asset),
-          photoTime: asset.createdAt,
-          createdAt: timestamp,
-          updatedAt: timestamp,
-          promptQuestion: promptQuestion,
-        );
+    final base = await _baseRecord(asset, timestamp, promptQuestion);
 
     final updated = base.copyWith(
       important: base.important || action == MemoryRecordAction.important,
       deleteCandidate:
           base.deleteCandidate || action == MemoryRecordAction.deleteCandidate,
       skipped: base.skipped || action == MemoryRecordAction.skipped,
+      promptQuestion: promptQuestion ?? base.promptQuestion,
       reviewStatus:
           action == MemoryRecordAction.skipped ? 'skipped' : base.reviewStatus,
       updatedAt: timestamp,
@@ -43,11 +35,51 @@ class MemoryActionService {
   Future<MemoryRecord> attachAudio(
     PhotoAsset asset,
     String audioPath, {
+    String? promptQuestion,
     DateTime? now,
   }) async {
     final timestamp = now ?? DateTime.now();
+    final base = await _baseRecord(asset, timestamp, promptQuestion);
+
+    final updated = base.copyWith(
+      audioPath: audioPath,
+      promptQuestion: promptQuestion ?? base.promptQuestion,
+      reviewStatus: 'raw',
+      updatedAt: timestamp,
+    );
+    await repository.upsert(updated);
+    return updated;
+  }
+
+  Future<MemoryRecord> saveTags(
+    PhotoAsset asset,
+    List<String> tags, {
+    String? promptQuestion,
+    DateTime? now,
+  }) async {
+    final timestamp = now ?? DateTime.now();
+    final base = await _baseRecord(asset, timestamp, promptQuestion);
+    final mergedTags = <String>{
+      ...base.userTags,
+      ...tags.where((tag) => tag.trim().isNotEmpty).map((tag) => tag.trim()),
+    }.toList(growable: false);
+
+    final updated = base.copyWith(
+      userTags: mergedTags,
+      promptQuestion: promptQuestion ?? base.promptQuestion,
+      updatedAt: timestamp,
+    );
+    await repository.upsert(updated);
+    return updated;
+  }
+
+  Future<MemoryRecord> _baseRecord(
+    PhotoAsset asset,
+    DateTime timestamp,
+    String? promptQuestion,
+  ) async {
     final existing = await repository.getByAssetId(asset.assetId);
-    final base = existing ??
+    return existing ??
         MemoryRecord(
           memoryId: _newMemoryId(asset, timestamp),
           assetId: asset.assetId,
@@ -55,16 +87,8 @@ class MemoryActionService {
           photoTime: asset.createdAt,
           createdAt: timestamp,
           updatedAt: timestamp,
-          promptQuestion: promptQuestion,
+          promptQuestion: promptQuestion ?? MemoryActionService.promptQuestion,
         );
-
-    final updated = base.copyWith(
-      audioPath: audioPath,
-      reviewStatus: 'raw',
-      updatedAt: timestamp,
-    );
-    await repository.upsert(updated);
-    return updated;
   }
 
   String _newMemoryId(PhotoAsset asset, DateTime now) {
