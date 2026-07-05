@@ -19,6 +19,7 @@ class MemoryCardScreen extends StatefulWidget {
     super.key,
     required this.photoLibraryService,
     required this.memoryRepository,
+    this.sessionLimit,
     RecordingService Function()? recordingServiceFactory,
     this.processedAssetIdsLoader,
     this.weightedRandomService = const WeightedRandomService(),
@@ -29,6 +30,7 @@ class MemoryCardScreen extends StatefulWidget {
 
   final PhotoLibraryService photoLibraryService;
   final MemoryRepository memoryRepository;
+  final int? sessionLimit;
   final RecordingService Function() recordingServiceFactory;
   final Future<Set<String>> Function()? processedAssetIdsLoader;
   final WeightedRandomService weightedRandomService;
@@ -45,6 +47,7 @@ class _MemoryCardScreenState extends State<MemoryCardScreen> {
   PhotoPermissionResult? _permission;
   List<PhotoAsset> _assets = const [];
   Set<String> _processedAssetIds = const {};
+  Set<String> _sessionShownAssetIds = const {};
   PhotoAsset? _currentAsset;
   Uint8List? _thumbnailBytes;
   String? _errorMessage;
@@ -52,6 +55,21 @@ class _MemoryCardScreenState extends State<MemoryCardScreen> {
 
   bool get _usesFolderSelection =>
       widget.photoLibraryService is WindowsFolderPhotoLibraryService;
+
+  bool get _hasReachedSessionLimit {
+    final limit = widget.sessionLimit;
+    return limit != null && _sessionShownAssetIds.length >= limit;
+  }
+
+  String get _completionTitle {
+    return widget.sessionLimit == null ? '这轮照片看完了' : '今日 5 张完成了';
+  }
+
+  String get _completionMessage {
+    return widget.sessionLimit == null
+        ? '没有更多未处理的照片可显示。'
+        : '今天已经看过 5 张照片，可以先休息一下。';
+  }
 
   String get _emptyStateMessage {
     if (_permission == PhotoPermissionResult.limited) {
@@ -72,7 +90,8 @@ class _MemoryCardScreenState extends State<MemoryCardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('开始一局')),
+      appBar:
+          AppBar(title: Text(widget.sessionLimit == null ? '开始一局' : '今日 5 张')),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(20),
@@ -94,6 +113,13 @@ class _MemoryCardScreenState extends State<MemoryCardScreen> {
                 message: _emptyStateMessage,
                 actionLabel: _usesFolderSelection ? '重新选择文件夹' : null,
                 onAction: _usesFolderSelection ? _changePhotoSource : null,
+              ),
+            MemoryCardState.sessionComplete => _CenteredMessage(
+                icon: Icons.check_circle_outline,
+                title: _completionTitle,
+                message: _completionMessage,
+                actionLabel: '返回首页',
+                onAction: () => Navigator.of(context).maybePop(),
               ),
             MemoryCardState.thumbnailFailed => _CenteredMessage(
                 icon: Icons.broken_image_outlined,
@@ -125,6 +151,7 @@ class _MemoryCardScreenState extends State<MemoryCardScreen> {
     setState(() {
       _state = MemoryCardState.loading;
       _errorMessage = null;
+      _sessionShownAssetIds = const {};
     });
 
     try {
@@ -178,6 +205,39 @@ class _MemoryCardScreenState extends State<MemoryCardScreen> {
       return;
     }
 
+    if (_hasReachedSessionLimit) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _currentAsset = null;
+        _thumbnailBytes = null;
+        _isSavingAction = false;
+        _state = MemoryCardState.sessionComplete;
+      });
+      return;
+    }
+
+    final excludedAssetIds = <String>{
+      ..._processedAssetIds,
+      ..._sessionShownAssetIds,
+    };
+    final candidates = _assets
+        .where((asset) => !excludedAssetIds.contains(asset.assetId))
+        .toList(growable: false);
+    if (candidates.isEmpty) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _currentAsset = null;
+        _thumbnailBytes = null;
+        _isSavingAction = false;
+        _state = MemoryCardState.sessionComplete;
+      });
+      return;
+    }
+
     setState(() {
       _state = MemoryCardState.loading;
       _errorMessage = null;
@@ -185,15 +245,14 @@ class _MemoryCardScreenState extends State<MemoryCardScreen> {
     });
 
     final asset = widget.weightedRandomService.pickPhoto(
-      _assets,
-      processedAssetIds: _processedAssetIds,
+      candidates,
       random: widget.random,
     );
     if (asset == null) {
       if (!mounted) {
         return;
       }
-      setState(() => _state = MemoryCardState.empty);
+      setState(() => _state = MemoryCardState.sessionComplete);
       return;
     }
     try {
@@ -215,6 +274,10 @@ class _MemoryCardScreenState extends State<MemoryCardScreen> {
       setState(() {
         _currentAsset = asset;
         _thumbnailBytes = thumbnail;
+        _sessionShownAssetIds = {
+          ..._sessionShownAssetIds,
+          asset.assetId,
+        };
         _state = MemoryCardState.loaded;
       });
     } catch (error) {
@@ -300,6 +363,7 @@ enum MemoryCardState {
   loading,
   permissionDenied,
   empty,
+  sessionComplete,
   thumbnailFailed,
   loaded,
 }

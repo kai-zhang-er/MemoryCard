@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../models/memory_record.dart';
 import '../services/export_service.dart';
 import '../services/memory_repository.dart';
 import '../services/photo_library_service.dart';
@@ -25,8 +24,6 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int _fakeRecordCount = 0;
-  bool _isSaving = false;
   bool _isExporting = false;
 
   @override
@@ -41,35 +38,33 @@ class _HomeScreenState extends State<HomeScreen> {
               'Memory Cards',
               style: Theme.of(context).textTheme.headlineMedium,
             ),
-            const SizedBox(height: 8),
-            const Text('任务一数据库验证：先用假数据确认本地记录可以写入和读取。'),
             const SizedBox(height: 20),
             FilledButton.icon(
-              onPressed: _openMemoryCard,
+              onPressed: () => _openMemoryCard(),
               icon: const Icon(Icons.play_arrow),
               label: const Text('开始一局'),
             ),
             const SizedBox(height: 12),
             OutlinedButton.icon(
-              onPressed: _isSaving ? null : _addFakeRecord,
-              icon: const Icon(Icons.add),
-              label: Text(_isSaving ? '保存中...' : '添加一条假记忆'),
+              onPressed: () => _openMemoryCard(sessionLimit: 5),
+              icon: const Icon(Icons.today_outlined),
+              label: const Text('今日 5 张'),
             ),
             const SizedBox(height: 12),
             OutlinedButton.icon(
               onPressed: () => _openList(MemoryListFilter.all),
               icon: const Icon(Icons.list_alt),
-              label: const Text('查看记忆列表'),
+              label: const Text('记忆列表'),
             ),
             OutlinedButton.icon(
               onPressed: () => _openList(MemoryListFilter.important),
               icon: const Icon(Icons.star_outline),
-              label: const Text('查看重要照片'),
+              label: const Text('重要照片'),
             ),
             OutlinedButton.icon(
               onPressed: () => _openList(MemoryListFilter.deleteCandidates),
               icon: const Icon(Icons.delete_outline),
-              label: const Text('查看待删除'),
+              label: const Text('待删除'),
             ),
             OutlinedButton.icon(
               onPressed: _isExporting ? null : _exportJson,
@@ -80,55 +75,13 @@ class _HomeScreenState extends State<HomeScreen> {
             const Card(
               child: Padding(
                 padding: EdgeInsets.all(16),
-                child: Text('隐私提示：只读取本地照片缩略图和元数据，不复制原图、不录音、不上传。'),
+                child: Text('照片只读显示；录音和记忆数据只保存在本机，不上传。'),
               ),
             ),
           ],
         ),
       ),
     );
-  }
-
-  Future<void> _addFakeRecord() async {
-    setState(() => _isSaving = true);
-    final now = DateTime.now();
-    final nextCount = _fakeRecordCount + 1;
-    final record = MemoryRecord(
-      memoryId: 'fake_memory_${now.microsecondsSinceEpoch}',
-      assetId: 'fake_asset_${nextCount.toString().padLeft(3, '0')}',
-      assetFingerprint: 'fake_fingerprint_$nextCount',
-      photoTime: now.subtract(Duration(days: 120 + nextCount)),
-      createdAt: now,
-      updatedAt: now,
-      important: nextCount.isOdd,
-      deleteCandidate: nextCount % 3 == 0,
-      skipped: nextCount % 4 == 0,
-      userTags: const ['假数据'],
-      aiLightTags: const ['task_one_seed'],
-      audioPath: nextCount % 2 == 0 ? 'audio/fake_$nextCount.m4a' : null,
-    );
-
-    try {
-      await widget.repository.upsert(record);
-      if (!mounted) {
-        return;
-      }
-      setState(() => _fakeRecordCount = nextCount);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('已保存 ${record.assetId}')),
-      );
-    } catch (error) {
-      if (!mounted) {
-        return;
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('保存失败：$error')),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _isSaving = false);
-      }
-    }
   }
 
   Future<void> _exportJson() async {
@@ -157,12 +110,13 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _openMemoryCard() {
+  void _openMemoryCard({int? sessionLimit}) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => MemoryCardScreen(
           photoLibraryService: widget.photoLibraryServiceFactory(),
           memoryRepository: widget.repository,
+          sessionLimit: sessionLimit,
         ),
       ),
     );

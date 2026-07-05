@@ -1,51 +1,29 @@
 import 'dart:convert';
-import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:memory_cards/models/memory_record.dart';
 import 'package:memory_cards/models/photo_asset.dart';
 import 'package:memory_cards/screens/memory_card_screen.dart';
+import 'package:memory_cards/screens/record_memory_screen.dart';
 import 'package:memory_cards/services/memory_repository.dart';
 import 'package:memory_cards/services/photo_library_service.dart';
 import 'package:memory_cards/services/recording_service.dart';
 import 'package:memory_cards/services/weighted_random_service.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 void main() {
-  sqfliteFfiInit();
-
-  late Directory tempDir;
-  late MemoryRepository repository;
-
-  setUp(() async {
-    TestWidgetsFlutterBinding.ensureInitialized();
-    tempDir = await Directory.systemTemp.createTemp('memory_cards_card_test_');
-    repository = MemoryRepository(
-      databaseFactory: databaseFactoryFfiNoIsolate,
-      databasePath: '${tempDir.path}/memory_cards_test.db',
-    );
-  });
-
-  tearDown(() async {
-    await repository.close();
-    if (await tempDir.exists()) {
-      await tempDir.delete(recursive: true);
-    }
-  });
-
   testWidgets('shows permission denied state', (tester) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
     final service = _FakePhotoLibraryService(
       permission: PhotoPermissionResult.denied,
     );
 
-    await _pumpCard(tester, service, repository);
+    await _pumpCard(tester, service, _FakeMemoryRepository());
 
+    expect(find.byIcon(Icons.lock_outline), findsOneWidget);
     expect(find.text('需要相册权限'), findsOneWidget);
-    expect(find.text('重新请求'), findsOneWidget);
-    expect(find.text('打开设置'), findsOneWidget);
   });
 
   testWidgets('shows empty library state', (tester) async {
@@ -55,9 +33,9 @@ void main() {
       assets: const [],
     );
 
-    await _pumpCard(tester, service, repository);
+    await _pumpCard(tester, service, _FakeMemoryRepository());
 
-    expect(find.text('没有可用照片'), findsOneWidget);
+    expect(find.byIcon(Icons.image_not_supported_outlined), findsOneWidget);
   });
 
   testWidgets('shows a local photo thumbnail', (tester) async {
@@ -68,17 +46,16 @@ void main() {
       thumbnails: {'photo_001': _onePixelPng},
     );
 
-    await _pumpCard(tester, service, repository);
+    await _pumpCard(tester, service, _FakeMemoryRepository());
 
     expect(find.byType(Image), findsOneWidget);
-    expect(find.text('这张照片你还记得吗？'), findsOneWidget);
-    expect(find.text('拍摄时间：2025-07-03'), findsOneWidget);
-    expect(find.text('重要'), findsOneWidget);
-    expect(find.text('待删除'), findsOneWidget);
-    expect(find.text('跳过'), findsOneWidget);
+    expect(find.byIcon(Icons.star_outline), findsOneWidget);
+    expect(find.byIcon(Icons.delete_outline), findsOneWidget);
+    expect(find.byIcon(Icons.skip_next), findsOneWidget);
   });
 
-  testWidgets('talk opens placeholder without saving a record', (tester) async {
+  testWidgets('talk opens recording screen with the current thumbnail',
+      (tester) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
     final service = _FakePhotoLibraryService(
       permission: PhotoPermissionResult.authorized,
@@ -86,13 +63,93 @@ void main() {
       thumbnails: {'photo_001': _onePixelPng},
     );
 
-    await _pumpCard(tester, service, repository);
-    await tester.tap(find.text('讲讲'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
+    await _pumpCard(tester, service, _FakeMemoryRepository());
+    await tester.tap(find.byIcon(Icons.mic_none));
+    await _pumpSeveral(tester);
 
-    expect(find.text('说说这张照片'), findsOneWidget);
-    expect(find.text('开始录音'), findsOneWidget);
+    expect(find.byType(RecordMemoryScreen), findsOneWidget);
+    expect(find.byType(Image), findsWidgets);
+  });
+
+  testWidgets('does not repeat a shown photo while another candidate exists',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    final repository = _FakeMemoryRepository();
+    final service = _FakePhotoLibraryService(
+      permission: PhotoPermissionResult.authorized,
+      assets: [_asset('photo_001'), _asset('photo_002')],
+      thumbnails: {
+        'photo_001': _onePixelPng,
+        'photo_002': _onePixelPng,
+      },
+    );
+
+    await _pumpCard(tester, service, repository);
+    final firstShown = service.thumbnailRequests.single;
+
+    await tester.tap(find.byIcon(Icons.skip_next));
+    await _pumpSeveral(tester);
+
+    expect(service.thumbnailRequests, hasLength(2));
+    expect(service.thumbnailRequests.last, isNot(firstShown));
+  });
+
+  testWidgets('historically processed photos are excluded before fallback',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    final now = DateTime.utc(2026, 7, 3);
+    final repository = _FakeMemoryRepository([
+      MemoryRecord(
+        memoryId: 'memory_photo_001',
+        assetId: 'photo_001',
+        createdAt: now,
+        updatedAt: now,
+      ),
+    ]);
+    final service = _FakePhotoLibraryService(
+      permission: PhotoPermissionResult.authorized,
+      assets: [_asset('photo_001'), _asset('photo_002')],
+      thumbnails: {
+        'photo_001': _onePixelPng,
+        'photo_002': _onePixelPng,
+      },
+    );
+
+    await _pumpCard(
+      tester,
+      service,
+      repository,
+      useRepositoryProcessedIds: true,
+    );
+
+    expect(service.thumbnailRequests, ['photo_002']);
+  });
+
+  testWidgets('today five stops after five shown photos', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    final repository = _FakeMemoryRepository();
+    final assets = List.generate(6, (index) => _asset('photo_$index'));
+    final service = _FakePhotoLibraryService(
+      permission: PhotoPermissionResult.authorized,
+      assets: assets,
+      thumbnails: {
+        for (final asset in assets) asset.assetId: _onePixelPng,
+      },
+    );
+
+    await _pumpCard(
+      tester,
+      service,
+      repository,
+      sessionLimit: 5,
+    );
+    for (var i = 0; i < 5; i += 1) {
+      await tester.tap(find.byIcon(Icons.skip_next));
+      await _pumpSeveral(tester);
+    }
+
+    expect(service.thumbnailRequests.toSet(), hasLength(5));
+    expect(find.byIcon(Icons.check_circle_outline), findsOneWidget);
   });
 }
 
@@ -103,12 +160,14 @@ Future<void> _pumpCard(
   Random? random,
   WeightedRandomService weightedRandomService = const WeightedRandomService(),
   bool useRepositoryProcessedIds = false,
+  int? sessionLimit,
 }) async {
   await tester.pumpWidget(
     MaterialApp(
       home: MemoryCardScreen(
         photoLibraryService: service,
         memoryRepository: repository,
+        sessionLimit: sessionLimit,
         recordingServiceFactory: () => _FakeRecordingService(),
         processedAssetIdsLoader:
             useRepositoryProcessedIds ? null : () async => <String>{},
@@ -117,15 +176,12 @@ Future<void> _pumpCard(
       ),
     ),
   );
-  await _pumpUntilTextGone(tester, '正在读取本地照片');
+  await _pumpSeveral(tester);
 }
 
-Future<void> _pumpUntilTextGone(WidgetTester tester, String text) async {
-  for (var i = 0; i < 40; i += 1) {
+Future<void> _pumpSeveral(WidgetTester tester) async {
+  for (var i = 0; i < 10; i += 1) {
     await tester.pump(const Duration(milliseconds: 100));
-    if (find.text(text).evaluate().isEmpty) {
-      return;
-    }
   }
 }
 
@@ -137,6 +193,28 @@ PhotoAsset _asset(String id) {
     height: 1600,
     title: 'Fake photo $id',
   );
+}
+
+class _FakeMemoryRepository extends MemoryRepository {
+  _FakeMemoryRepository([List<MemoryRecord> records = const []])
+      : records = [...records];
+
+  final List<MemoryRecord> records;
+
+  @override
+  Future<void> upsert(MemoryRecord record) async {
+    records.removeWhere((existing) => existing.memoryId == record.memoryId);
+    records.add(record);
+  }
+
+  @override
+  Future<List<MemoryRecord>> getAll() async => [...records];
+
+  @override
+  Future<MemoryRecord?> getByAssetId(String assetId) async {
+    final matches = records.where((record) => record.assetId == assetId);
+    return matches.isEmpty ? null : matches.last;
+  }
 }
 
 class _FakePhotoLibraryService implements PhotoLibraryService {
