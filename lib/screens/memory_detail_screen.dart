@@ -45,6 +45,7 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
   ];
 
   late MemoryRecord _record;
+  late final TextEditingController _memoryTextController;
   bool _isSaving = false;
   bool _isDeletingAudio = false;
 
@@ -52,7 +53,14 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
   void initState() {
     super.initState();
     _record = widget.initialRecord;
+    _memoryTextController = TextEditingController(text: _record.memoryText);
     _reloadRecord();
+  }
+
+  @override
+  void dispose() {
+    _memoryTextController.dispose();
+    super.dispose();
   }
 
   @override
@@ -133,6 +141,28 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
                       ),
             ),
             const SizedBox(height: 20),
+            Text('\u6587\u5b57\u5907\u6ce8',
+                style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _memoryTextController,
+              minLines: 2,
+              maxLines: 5,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                hintText: '\u5199\u4e00\u53e5\u60f3\u8d77\u6765\u7684\u4e8b',
+              ),
+            ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: FilledButton.icon(
+                onPressed: _isSaving ? null : _saveMemoryText,
+                icon: const Icon(Icons.notes_outlined),
+                label: const Text('\u4fdd\u5b58\u5907\u6ce8'),
+              ),
+            ),
+            const SizedBox(height: 20),
             Text('\u5f55\u97f3',
                 style: Theme.of(context).textTheme.titleMedium),
             if (audioPath != null && audioPath.trim().isNotEmpty) ...[
@@ -173,7 +203,10 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
     if (!mounted || latest == null) {
       return;
     }
-    setState(() => _record = latest);
+    setState(() {
+      _record = latest;
+      _memoryTextController.text = latest.memoryText;
+    });
   }
 
   Future<void> _toggleTag(String tag, bool selected) async {
@@ -209,6 +242,12 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
         SnackBar(content: Text('\u4fdd\u5b58\u5931\u8d25\uff1a$error')),
       );
     }
+  }
+
+  Future<void> _saveMemoryText() async {
+    await _updateRecord(
+      _record.copyWith(memoryText: _memoryTextController.text.trim()),
+    );
   }
 
   Future<void> _deleteAudio() async {

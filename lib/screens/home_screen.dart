@@ -29,7 +29,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('记忆卡')),
+      appBar: AppBar(title: const Text('\u8bb0\u5fc6\u5361')),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(20),
@@ -42,40 +42,46 @@ class _HomeScreenState extends State<HomeScreen> {
             FilledButton.icon(
               onPressed: () => _openMemoryCard(),
               icon: const Icon(Icons.play_arrow),
-              label: const Text('开始一局'),
+              label: const Text('\u5f00\u59cb\u4e00\u5c40'),
             ),
             const SizedBox(height: 12),
             OutlinedButton.icon(
               onPressed: () => _openMemoryCard(sessionLimit: 5),
               icon: const Icon(Icons.today_outlined),
-              label: const Text('今日 5 张'),
+              label: const Text('\u4eca\u65e5 5 \u5f20'),
             ),
             const SizedBox(height: 12),
             OutlinedButton.icon(
               onPressed: () => _openList(MemoryListFilter.all),
               icon: const Icon(Icons.list_alt),
-              label: const Text('记忆列表'),
+              label: const Text('\u8bb0\u5fc6\u5217\u8868'),
             ),
             OutlinedButton.icon(
               onPressed: () => _openList(MemoryListFilter.important),
               icon: const Icon(Icons.star_outline),
-              label: const Text('重要照片'),
+              label: const Text('\u91cd\u8981\u7167\u7247'),
             ),
             OutlinedButton.icon(
               onPressed: () => _openList(MemoryListFilter.deleteCandidates),
               icon: const Icon(Icons.delete_outline),
-              label: const Text('待删除'),
+              label: const Text('\u5f85\u5220\u9664'),
             ),
             OutlinedButton.icon(
-              onPressed: _isExporting ? null : _exportJson,
+              onPressed: _isExporting ? null : _exportMemories,
               icon: const Icon(Icons.file_download_outlined),
-              label: Text(_isExporting ? '导出中...' : '导出 JSON'),
+              label: Text(
+                _isExporting
+                    ? '\u5bfc\u51fa\u4e2d...'
+                    : '\u5bfc\u51fa\u8d44\u6599',
+              ),
             ),
             const SizedBox(height: 24),
             const Card(
               child: Padding(
                 padding: EdgeInsets.all(16),
-                child: Text('照片只读显示；录音和记忆数据只保存在本机，不上传。'),
+                child: Text(
+                  '\u7167\u7247\u53ea\u8bfb\u663e\u793a\uff1b\u5f55\u97f3\u548c\u8bb0\u5fc6\u6570\u636e\u53ea\u4fdd\u5b58\u5728\u672c\u673a\uff0c\u4e0d\u4e0a\u4f20\u3002',
+                ),
               ),
             ),
           ],
@@ -84,24 +90,27 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Future<void> _exportJson() async {
+  Future<void> _exportMemories() async {
     setState(() => _isExporting = true);
     try {
       final service = widget.exportServiceFactory?.call(widget.repository) ??
           ExportService(widget.repository);
-      final file = await service.exportMemoriesJson();
+      final result = await service.exportMemories();
       if (!mounted) {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('已导出：${file.path}')),
+        SnackBar(
+          content:
+              Text('\u5df2\u5bfc\u51fa\uff1a${result.exportDirectory.path}'),
+        ),
       );
     } catch (error) {
       if (!mounted) {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('导出失败：$error')),
+        SnackBar(content: Text('\u5bfc\u51fa\u5931\u8d25\uff1a$error')),
       );
     } finally {
       if (mounted) {

@@ -5,7 +5,8 @@ import 'memory_repository.dart';
 class MemoryActionService {
   MemoryActionService(this.repository);
 
-  static const String promptQuestion = '这张照片你还记得吗？';
+  static const String promptQuestion =
+      '\u8fd9\u5f20\u7167\u7247\u4f60\u8fd8\u8bb0\u5f97\u5417\uff1f';
 
   final MemoryRepository repository;
 
@@ -36,6 +37,7 @@ class MemoryActionService {
     PhotoAsset asset,
     String audioPath, {
     String? promptQuestion,
+    String? memoryText,
     DateTime? now,
   }) async {
     final timestamp = now ?? DateTime.now();
@@ -44,6 +46,7 @@ class MemoryActionService {
     final updated = base.copyWith(
       audioPath: audioPath,
       promptQuestion: promptQuestion ?? base.promptQuestion,
+      memoryText: memoryText ?? base.memoryText,
       reviewStatus: 'raw',
       updatedAt: timestamp,
     );
@@ -107,9 +110,9 @@ class MemoryActionService {
 }
 
 enum MemoryRecordAction {
-  important('标记重要'),
-  deleteCandidate('标记待删除'),
-  skipped('已跳过');
+  important('\u6807\u8bb0\u91cd\u8981'),
+  deleteCandidate('\u6807\u8bb0\u5f85\u5220\u9664'),
+  skipped('\u5df2\u8df3\u8fc7');
 
   const MemoryRecordAction(this.confirmationText);
 

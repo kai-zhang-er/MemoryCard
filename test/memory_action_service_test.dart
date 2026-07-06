@@ -35,7 +35,7 @@ void main() {
     final record = await service.saveAction(
       _asset('photo_001'),
       MemoryRecordAction.important,
-      promptQuestion: '这是在哪里？',
+      promptQuestion: '杩欐槸鍦ㄥ摢閲岋紵',
       now: DateTime.utc(2026, 7, 3),
     );
 
@@ -46,7 +46,7 @@ void main() {
     expect(saved.important, isTrue);
     expect(saved.deleteCandidate, isFalse);
     expect(saved.skipped, isFalse);
-    expect(saved.promptQuestion, '这是在哪里？');
+    expect(saved.promptQuestion, '杩欐槸鍦ㄥ摢閲岋紵');
   });
 
   test('delete candidate action creates a delete candidate record', () async {
@@ -107,7 +107,7 @@ void main() {
     await service.attachAudio(
       _asset('photo_001'),
       'audio/2026/memory_photo_001.m4a',
-      promptQuestion: '这一天后来发生了什么？',
+      promptQuestion: '杩欎竴澶╁悗鏉ュ彂鐢熶簡浠€涔堬紵',
       now: DateTime.utc(2026, 7, 3),
     );
 
@@ -115,12 +115,51 @@ void main() {
 
     expect(saved, isNotNull);
     expect(saved!.audioPath, 'audio/2026/memory_photo_001.m4a');
-    expect(saved.promptQuestion, '这一天后来发生了什么？');
+    expect(saved.promptQuestion, '杩欎竴澶╁悗鏉ュ彂鐢熶簡浠€涔堬紵');
     expect(saved.transcript, '');
     expect(saved.memoryText, '');
     expect(saved.reviewStatus, 'raw');
   });
 
+  test('attaching audio saves supplied manual note separately from transcript',
+      () async {
+    await service.attachAudio(
+      _asset('photo_001'),
+      'audio/2026/memory_photo_001.m4a',
+      memoryText:
+          '\u8fd9\u662f\u672c\u79d1\u6bd5\u4e1a\u65c5\u884c\uff0c\u5728\u53a6\u95e8\u3002',
+      now: DateTime.utc(2026, 7, 3),
+    );
+
+    final saved = await repository.getByAssetId('photo_001');
+
+    expect(saved, isNotNull);
+    expect(saved!.memoryText,
+        '\u8fd9\u662f\u672c\u79d1\u6bd5\u4e1a\u65c5\u884c\uff0c\u5728\u53a6\u95e8\u3002');
+    expect(saved.transcript, '');
+  });
+
+  test('attaching audio preserves existing manual note when none is supplied',
+      () async {
+    final asset = _asset('photo_001');
+    await service.attachAudio(
+      asset,
+      'audio/2026/first.m4a',
+      memoryText: '\u65e7\u5907\u6ce8',
+      now: DateTime.utc(2026, 7, 3, 9),
+    );
+    await service.attachAudio(
+      asset,
+      'audio/2026/second.m4a',
+      now: DateTime.utc(2026, 7, 3, 10),
+    );
+
+    final saved = await repository.getByAssetId('photo_001');
+
+    expect(saved, isNotNull);
+    expect(saved!.audioPath, 'audio/2026/second.m4a');
+    expect(saved.memoryText, '\u65e7\u5907\u6ce8');
+  });
   test('attaching audio preserves existing flags', () async {
     final asset = _asset('photo_001');
     await service.saveAction(
@@ -147,22 +186,22 @@ void main() {
     final asset = _asset('photo_001');
     await service.saveTags(
       asset,
-      ['旅行', '家人'],
-      promptQuestion: '这是在哪里？',
+      ['鏃呰', '瀹朵汉'],
+      promptQuestion: '杩欐槸鍦ㄥ摢閲岋紵',
       now: DateTime.utc(2026, 7, 3, 9),
     );
     await service.saveTags(
       asset,
-      ['家人', '美食'],
-      promptQuestion: '这是在哪里？',
+      ['瀹朵汉', '缇庨'],
+      promptQuestion: '杩欐槸鍦ㄥ摢閲岋紵',
       now: DateTime.utc(2026, 7, 3, 10),
     );
 
     final saved = await repository.getByAssetId('photo_001');
 
     expect(saved, isNotNull);
-    expect(saved!.userTags, ['旅行', '家人', '美食']);
-    expect(saved.promptQuestion, '这是在哪里？');
+    expect(saved!.userTags, ['鏃呰', '瀹朵汉', '缇庨']);
+    expect(saved.promptQuestion, '杩欐槸鍦ㄥ摢閲岋紵');
     expect(saved.updatedAt, DateTime.utc(2026, 7, 3, 10));
   });
 
@@ -180,7 +219,7 @@ void main() {
     );
     await service.saveTags(
       asset,
-      ['朋友'],
+      ['鏈嬪弸'],
       now: DateTime.utc(2026, 7, 3, 11),
     );
 
@@ -189,7 +228,7 @@ void main() {
     expect(saved, isNotNull);
     expect(saved!.important, isTrue);
     expect(saved.audioPath, 'audio/2026/memory_photo_001.m4a');
-    expect(saved.userTags, ['朋友']);
+    expect(saved.userTags, ['鏈嬪弸']);
   });
 }
 

@@ -36,10 +36,18 @@ class _RecordMemoryScreenState extends State<RecordMemoryScreen> {
   String? _errorMessage;
   Duration _elapsed = Duration.zero;
   Timer? _timer;
+  late final TextEditingController _memoryTextController;
+
+  @override
+  void initState() {
+    super.initState();
+    _memoryTextController = TextEditingController();
+  }
 
   @override
   void dispose() {
     _timer?.cancel();
+    _memoryTextController.dispose();
     widget.recordingService.dispose();
     super.dispose();
   }
@@ -47,75 +55,89 @@ class _RecordMemoryScreenState extends State<RecordMemoryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('讲讲')),
+      appBar: AppBar(title: const Text('\u8bb2\u8bb2')),
       body: SafeArea(
-        child: Padding(
+        child: ListView(
           padding: const EdgeInsets.all(20),
-          child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (widget.thumbnailBytes != null) ...[
-                  AdaptivePhotoCard(
-                    imageBytes: widget.thumbnailBytes!,
-                    imageWidth: widget.asset.width,
-                    imageHeight: widget.asset.height,
-                    maxDesktopWidth: 360,
-                    maxHeightFactor: 0.28,
-                  ),
-                  const SizedBox(height: 16),
-                ],
-                Icon(_state.icon, size: 56),
-                const SizedBox(height: 16),
-                Text(
-                  _state.title,
-                  style: Theme.of(context).textTheme.titleLarge,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  widget.promptQuestion,
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '当前照片：${widget.asset.assetId}\n拍摄时间：${formatNullableDate(widget.asset.createdAt)}',
-                  textAlign: TextAlign.center,
-                ),
-                if (_state == RecordingScreenState.recording) ...[
+          children: [
+            Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (widget.thumbnailBytes != null) ...[
+                    AdaptivePhotoCard(
+                      imageBytes: widget.thumbnailBytes!,
+                      imageWidth: widget.asset.width,
+                      imageHeight: widget.asset.height,
+                      maxDesktopWidth: 360,
+                      maxHeightFactor: 0.28,
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                  Icon(_state.icon, size: 56),
                   const SizedBox(height: 16),
                   Text(
-                    _formatElapsed(_elapsed),
-                    style: Theme.of(context).textTheme.headlineMedium,
+                    _state.title,
+                    style: Theme.of(context).textTheme.titleLarge,
+                    textAlign: TextAlign.center,
                   ),
-                ],
-                if (_relativeAudioPath != null) ...[
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 8),
                   Text(
-                    '录音文件：$_relativeAudioPath',
+                    widget.promptQuestion,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '\u5f53\u524d\u7167\u7247\uff1a${widget.asset.assetId}\n\u62cd\u6444\u65f6\u95f4\uff1a${formatNullableDate(widget.asset.createdAt)}',
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _memoryTextController,
+                    minLines: 2,
+                    maxLines: 4,
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      labelText: '\u6587\u5b57\u5907\u6ce8',
+                      hintText:
+                          '\u4e5f\u53ef\u4ee5\u53ea\u5199\u51e0\u53e5\u8bdd\uff0c\u4e0d\u5f55\u97f3',
+                    ),
+                  ),
+                  if (_state == RecordingScreenState.recording) ...[
+                    const SizedBox(height: 16),
+                    Text(
+                      _formatElapsed(_elapsed),
+                      style: Theme.of(context).textTheme.headlineMedium,
+                    ),
+                  ],
+                  if (_relativeAudioPath != null) ...[
+                    const SizedBox(height: 16),
+                    Text(
+                      '\u5f55\u97f3\u6587\u4ef6\uff1a$_relativeAudioPath',
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                  if (_errorMessage != null) ...[
+                    const SizedBox(height: 16),
+                    Text(
+                      _errorMessage!,
+                      textAlign: TextAlign.center,
+                      style:
+                          TextStyle(color: Theme.of(context).colorScheme.error),
+                    ),
+                  ],
+                  const SizedBox(height: 24),
+                  _buildActions(),
+                  const SizedBox(height: 12),
+                  const Text(
+                    '\u5f55\u97f3\u548c\u6587\u5b57\u5907\u6ce8\u53ea\u4fdd\u5b58\u5728\u672c\u673a App \u76ee\u5f55\uff0c\u4e0d\u4e0a\u4f20\u3001\u4e0d\u8f6c\u5199\u3002',
                     textAlign: TextAlign.center,
                   ),
                 ],
-                if (_errorMessage != null) ...[
-                  const SizedBox(height: 16),
-                  Text(
-                    _errorMessage!,
-                    textAlign: TextAlign.center,
-                    style:
-                        TextStyle(color: Theme.of(context).colorScheme.error),
-                  ),
-                ],
-                const SizedBox(height: 24),
-                _buildActions(),
-                const SizedBox(height: 12),
-                const Text(
-                  '录音只保存在本机 App 目录，不上传、不转写。',
-                  textAlign: TextAlign.center,
-                ),
-              ],
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );
@@ -126,12 +148,12 @@ class _RecordMemoryScreenState extends State<RecordMemoryScreen> {
       RecordingScreenState.initial => FilledButton.icon(
           onPressed: _startRecording,
           icon: const Icon(Icons.mic_none),
-          label: const Text('开始录音'),
+          label: const Text('\u5f00\u59cb\u5f55\u97f3'),
         ),
       RecordingScreenState.recording => FilledButton.icon(
           onPressed: _stopRecording,
           icon: const Icon(Icons.stop),
-          label: const Text('停止录音'),
+          label: const Text('\u505c\u6b62\u5f55\u97f3'),
         ),
       RecordingScreenState.stopped => Wrap(
           spacing: 12,
@@ -141,12 +163,12 @@ class _RecordMemoryScreenState extends State<RecordMemoryScreen> {
             FilledButton.icon(
               onPressed: _saveRecording,
               icon: const Icon(Icons.save_outlined),
-              label: const Text('保存'),
+              label: const Text('\u4fdd\u5b58'),
             ),
             TextButton.icon(
               onPressed: _discardRecording,
               icon: const Icon(Icons.close),
-              label: const Text('不保存'),
+              label: const Text('\u4e0d\u4fdd\u5b58'),
             ),
           ],
         ),
@@ -158,11 +180,11 @@ class _RecordMemoryScreenState extends State<RecordMemoryScreen> {
           children: [
             FilledButton(
               onPressed: _startRecording,
-              child: const Text('重新请求'),
+              child: const Text('\u91cd\u65b0\u8bf7\u6c42'),
             ),
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('返回'),
+              child: const Text('\u8fd4\u56de'),
             ),
           ],
         ),
@@ -173,11 +195,11 @@ class _RecordMemoryScreenState extends State<RecordMemoryScreen> {
           children: [
             FilledButton(
               onPressed: _startRecording,
-              child: const Text('重试'),
+              child: const Text('\u91cd\u8bd5'),
             ),
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('返回'),
+              child: const Text('\u8fd4\u56de'),
             ),
           ],
         ),
@@ -200,7 +222,8 @@ class _RecordMemoryScreenState extends State<RecordMemoryScreen> {
         }
         setState(() {
           _state = RecordingScreenState.denied;
-          _errorMessage = '需要麦克风权限才能录制这段回忆。';
+          _errorMessage =
+              '\u9700\u8981\u9ea6\u514b\u98ce\u6743\u9650\u624d\u80fd\u5f55\u5236\u8fd9\u6bb5\u56de\u5fc6\u3002';
         });
         return;
       }
@@ -217,7 +240,7 @@ class _RecordMemoryScreenState extends State<RecordMemoryScreen> {
       }
       setState(() {
         _state = RecordingScreenState.error;
-        _errorMessage = '录音启动失败：$error';
+        _errorMessage = '\u5f55\u97f3\u542f\u52a8\u5931\u8d25\uff1a$error';
       });
     }
   }
@@ -232,7 +255,8 @@ class _RecordMemoryScreenState extends State<RecordMemoryScreen> {
       if (path == null || path.isEmpty) {
         setState(() {
           _state = RecordingScreenState.error;
-          _errorMessage = '没有拿到录音文件路径，请重试。';
+          _errorMessage =
+              '\u6ca1\u6709\u62ff\u5230\u5f55\u97f3\u6587\u4ef6\u8def\u5f84\uff0c\u8bf7\u91cd\u8bd5\u3002';
         });
         return;
       }
@@ -246,7 +270,7 @@ class _RecordMemoryScreenState extends State<RecordMemoryScreen> {
       }
       setState(() {
         _state = RecordingScreenState.error;
-        _errorMessage = '停止录音失败：$error';
+        _errorMessage = '\u505c\u6b62\u5f55\u97f3\u5931\u8d25\uff1a$error';
       });
     }
   }
@@ -263,6 +287,7 @@ class _RecordMemoryScreenState extends State<RecordMemoryScreen> {
         widget.asset,
         path,
         promptQuestion: widget.promptQuestion,
+        memoryText: _memoryTextController.text.trim(),
       );
       if (!mounted) {
         return;
@@ -274,7 +299,8 @@ class _RecordMemoryScreenState extends State<RecordMemoryScreen> {
       }
       setState(() {
         _state = RecordingScreenState.error;
-        _errorMessage = '保存录音记录失败：$error';
+        _errorMessage =
+            '\u4fdd\u5b58\u5f55\u97f3\u8bb0\u5f55\u5931\u8d25\uff1a$error';
       });
     }
   }
@@ -312,12 +338,12 @@ class _RecordMemoryScreenState extends State<RecordMemoryScreen> {
 }
 
 enum RecordingScreenState {
-  initial(Icons.mic_none, '说说这张照片'),
-  recording(Icons.fiber_manual_record, '正在录音'),
-  stopped(Icons.check_circle_outline, '录音已停止'),
-  saving(Icons.save_outlined, '正在保存'),
-  denied(Icons.lock_outline, '需要麦克风权限'),
-  error(Icons.error_outline, '录音遇到问题');
+  initial(Icons.mic_none, '\u8bf4\u8bf4\u8fd9\u5f20\u7167\u7247'),
+  recording(Icons.fiber_manual_record, '\u6b63\u5728\u5f55\u97f3'),
+  stopped(Icons.check_circle_outline, '\u5f55\u97f3\u5df2\u505c\u6b62'),
+  saving(Icons.save_outlined, '\u6b63\u5728\u4fdd\u5b58'),
+  denied(Icons.lock_outline, '\u9700\u8981\u9ea6\u514b\u98ce\u6743\u9650'),
+  error(Icons.error_outline, '\u5f55\u97f3\u9047\u5230\u95ee\u9898');
 
   const RecordingScreenState(this.icon, this.title);
 

@@ -25,6 +25,8 @@ const _deleteMemoryText = '\u5220\u9664\u8fd9\u6761\u8bb0\u5fc6\u8bb0\u5f55';
 const _deleteDialogText =
     '\u8fd9\u53ea\u4f1a\u5220\u9664 App \u91cc\u7684\u8bb0\u5fc6\u8bb0\u5f55\uff0c\u4e0d\u4f1a\u5220\u9664\u6216\u4fee\u6539\u539f\u59cb\u7167\u7247\u3002';
 const _confirmDeleteText = '\u5220\u9664\u8bb0\u5f55';
+const _saveNoteText = '\u4fdd\u5b58\u5907\u6ce8';
+const _noteHintText = '\u5199\u4e00\u53e5\u60f3\u8d77\u6765\u7684\u4e8b';
 
 void main() {
   testWidgets('MemoryDetailScreen shows editable record details',
@@ -89,6 +91,23 @@ void main() {
     expect(repository.record.reviewStatus, 'skipped');
   });
 
+  testWidgets('manual note can be edited and persisted', (tester) async {
+    final repository =
+        _FakeMemoryRepository(_record(memoryText: '\u65e7\u5907\u6ce8'));
+
+    await _pumpDetail(tester, repository: repository);
+    await tester.pump();
+
+    await tester.enterText(
+      find.widgetWithText(TextField, _noteHintText),
+      '\u8fd9\u662f\u672c\u79d1\u6bd5\u4e1a\u65c5\u884c\uff0c\u5728\u53a6\u95e8\u3002',
+    );
+    await tester.tap(find.text(_saveNoteText));
+    await tester.pump();
+
+    expect(repository.record.memoryText,
+        '\u8fd9\u662f\u672c\u79d1\u6bd5\u4e1a\u65c5\u884c\uff0c\u5728\u53a6\u95e8\u3002');
+  });
   testWidgets('audio can be deleted without deleting the memory record',
       (tester) async {
     final tempDir =
@@ -209,6 +228,7 @@ MemoryRecord _record({
   bool deleteCandidate = false,
   bool skipped = false,
   String? audioPath,
+  String memoryText = '',
 }) {
   final now = DateTime.utc(2026, 7, 5, 10);
   return MemoryRecord(
@@ -222,6 +242,7 @@ MemoryRecord _record({
     skipped: skipped,
     userTags: userTags,
     audioPath: audioPath,
+    memoryText: memoryText,
   );
 }
 

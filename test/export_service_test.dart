@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:memory_cards/models/memory_record.dart';
 import 'package:memory_cards/services/export_service.dart';
 import 'package:memory_cards/services/memory_repository.dart';
+import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 void main() {
@@ -58,23 +59,86 @@ void main() {
             .map((record) => record['memory_id']),
         containsAll(['memory_001', 'memory_002']));
   });
+
+  test('exports json and human-readable markdown files', () async {
+    await repository.upsert(
+      _record(
+        'memory:001',
+        important: true,
+        audioPath: 'audio/2026/memory.m4a',
+        memoryText:
+            '\u8fd9\u662f\u672c\u79d1\u6bd5\u4e1a\u65c5\u884c\uff0c\u5728\u53a6\u95e8\u3002',
+        promptQuestion: '\u8fd9\u662f\u5728\u54ea\u91cc\uff1f',
+      ),
+    );
+    await repository
+        .upsert(_record('memory/without/date', hasPhotoTime: false));
+    final service = ExportService(
+      repository,
+      directoryProvider: () async => documentsDir,
+    );
+
+    final result = await service.exportMemories(
+      exportedAt: DateTime.utc(2026, 7, 3, 10),
+    );
+    final files = result.markdownDirectory
+        .listSync()
+        .whereType<File>()
+        .map((file) => p.basename(file.path))
+        .toList(growable: false);
+    final markdownFile = File(
+      p.join(result.markdownDirectory.path, '2025-06-03_memory_001.md'),
+    );
+    final markdown = await markdownFile.readAsString();
+
+    expect(await result.jsonFile.exists(), isTrue);
+    expect(result.markdownCount, 2);
+    expect(files, contains('2025-06-03_memory_001.md'));
+    expect(files, contains('unknown-date_memory_without_date.md'));
+    expect(markdown, contains('# \u7167\u7247\u8bb0\u5fc6'));
+    expect(markdown, contains('- \u6807\u7b7e\uff1atest'));
+    expect(markdown, contains('- \u72b6\u6001\uff1a\u91cd\u8981'));
+    expect(markdown,
+        contains('- \u5f55\u97f3\u8def\u5f84\uff1aaudio/2026/memory.m4a'));
+    expect(
+        markdown,
+        contains(
+            '\u63d0\u793a\u95ee\u9898\uff1a\u8fd9\u662f\u5728\u54ea\u91cc\uff1f'));
+    expect(markdown, contains('\u6587\u5b57\u5907\u6ce8'));
+    expect(
+        markdown,
+        contains(
+            '\u8fd9\u662f\u672c\u79d1\u6bd5\u4e1a\u65c5\u884c\uff0c\u5728\u53a6\u95e8\u3002'));
+    expect(markdown, contains('\u5f85\u8f6c\u5199\u3002'));
+    expect(markdown, contains('audio/'));
+  });
 }
 
 MemoryRecord _record(
   String id, {
   bool important = false,
   bool deleteCandidate = false,
+  bool hasPhotoTime = true,
+  String? audioPath,
+  String memoryText = '',
+  String transcript = '',
+  String promptQuestion =
+      '\u8fd9\u5f20\u7167\u7247\u4f60\u8fd8\u8bb0\u5f97\u5417\uff1f',
 }) {
   final now = DateTime.utc(2026, 7, 3, 9);
   return MemoryRecord(
     memoryId: id,
     assetId: 'asset_$id',
-    photoTime: now.subtract(const Duration(days: 400)),
+    photoTime: hasPhotoTime ? DateTime.utc(2025, 6, 3) : null,
     createdAt: now,
     updatedAt: now,
     important: important,
     deleteCandidate: deleteCandidate,
     userTags: const ['test'],
     aiLightTags: const ['old_photo'],
+    audioPath: audioPath,
+    memoryText: memoryText,
+    transcript: transcript,
+    promptQuestion: promptQuestion,
   );
 }

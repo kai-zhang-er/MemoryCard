@@ -9,17 +9,25 @@ import 'package:memory_cards/screens/record_memory_screen.dart';
 import 'package:memory_cards/services/memory_repository.dart';
 import 'package:memory_cards/services/recording_service.dart';
 
+const _startRecordingText = '\u5f00\u59cb\u5f55\u97f3';
+const _stopRecordingText = '\u505c\u6b62\u5f55\u97f3';
+const _saveText = '\u4fdd\u5b58';
+const _discardText = '\u4e0d\u4fdd\u5b58';
+const _retryPermissionText = '\u91cd\u65b0\u8bf7\u6c42';
+const _permissionTitle = '\u9700\u8981\u9ea6\u514b\u98ce\u6743\u9650';
+const _noteLabel = '\u6587\u5b57\u5907\u6ce8';
+
 void main() {
   testWidgets('shows denied state when microphone permission is missing',
       (tester) async {
     final service = _FakeRecordingService(hasPermissionValue: false);
 
     await _pumpScreen(tester, service, _FakeMemoryRepository());
-    await tester.tap(find.text('开始录音'));
+    await tester.tap(find.text(_startRecordingText));
     await tester.pump();
 
-    expect(find.text('需要麦克风权限'), findsOneWidget);
-    expect(find.text('重新请求'), findsOneWidget);
+    expect(find.text(_permissionTitle), findsOneWidget);
+    expect(find.text(_retryPermissionText), findsOneWidget);
   });
 
   testWidgets('shows the current photo thumbnail while recording',
@@ -44,16 +52,43 @@ void main() {
     );
 
     await _pumpScreen(tester, service, repository);
-    await tester.tap(find.text('开始录音'));
+    await tester.tap(find.text(_startRecordingText));
     await tester.pump();
-    await tester.tap(find.text('停止录音'));
+    await tester.tap(find.text(_stopRecordingText));
     await tester.pump();
-    await tester.tap(find.text('保存'));
+    await tester.tap(find.text(_saveText));
     await tester.pump();
 
     final saved = await repository.getByAssetId('photo_001');
     expect(saved, isNotNull);
-    expect(saved!.promptQuestion, '这是在哪里？');
+    expect(saved!.promptQuestion, '\u8fd9\u662f\u5728\u54ea\u91cc\uff1f');
+  });
+
+  testWidgets('saving recording stores manual note separately from transcript',
+      (tester) async {
+    final repository = _FakeMemoryRepository();
+    final service = _FakeRecordingService(
+      hasPermissionValue: true,
+      stopPath: 'audio/2026/memory_photo_001.m4a',
+    );
+
+    await _pumpScreen(tester, service, repository);
+    await tester.enterText(
+      find.widgetWithText(TextField, _noteLabel),
+      '\u8fd9\u662f\u672c\u79d1\u6bd5\u4e1a\u65c5\u884c\uff0c\u5728\u53a6\u95e8\u3002',
+    );
+    await tester.tap(find.text(_startRecordingText));
+    await tester.pump();
+    await tester.tap(find.text(_stopRecordingText));
+    await tester.pump();
+    await tester.tap(find.text(_saveText));
+    await tester.pump();
+
+    final saved = await repository.getByAssetId('photo_001');
+    expect(saved, isNotNull);
+    expect(saved!.memoryText,
+        '\u8fd9\u662f\u672c\u79d1\u6bd5\u4e1a\u65c5\u884c\uff0c\u5728\u53a6\u95e8\u3002');
+    expect(saved.transcript, '');
   });
 
   testWidgets('discarding recording does not write record', (tester) async {
@@ -63,11 +98,11 @@ void main() {
     );
 
     await _pumpScreen(tester, service, _FakeMemoryRepository());
-    await tester.tap(find.text('开始录音'));
+    await tester.tap(find.text(_startRecordingText));
     await tester.pump();
-    await tester.tap(find.text('停止录音'));
+    await tester.tap(find.text(_stopRecordingText));
     await tester.pump();
-    await tester.tap(find.text('不保存'));
+    await tester.tap(find.text(_discardText));
     await tester.pump();
     expect(service.cancelCalled, isTrue);
   });
@@ -86,7 +121,7 @@ Future<void> _pumpScreen(
         memoryRepository: repository,
         recordingService: recordingService,
         thumbnailBytes: thumbnailBytes,
-        promptQuestion: '这是在哪里？',
+        promptQuestion: '\u8fd9\u662f\u5728\u54ea\u91cc\uff1f',
       ),
     ),
   );
