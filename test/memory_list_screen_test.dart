@@ -149,6 +149,10 @@ class _FakePhotoLibraryService implements PhotoLibraryService {
   final List<String> thumbnailRequests = [];
 
   @override
+  Future<PhotoDeleteResult> deleteOriginalPhoto(String assetId) async =>
+      const PhotoDeleteResult.unsupported();
+
+  @override
   Future<List<PhotoAsset>> getPhotoAssets({int limit = 80}) async => const [];
 
   @override

@@ -36,17 +36,23 @@ class _RecordMemoryScreenState extends State<RecordMemoryScreen> {
   String? _errorMessage;
   Duration _elapsed = Duration.zero;
   Timer? _timer;
+  Timer? _memoryTextDebounce;
+  String? _memoryTextSaveMessage;
+  bool _allowPop = false;
+  bool _isHandlingPop = false;
   late final TextEditingController _memoryTextController;
 
   @override
   void initState() {
     super.initState();
     _memoryTextController = TextEditingController();
+    _memoryTextController.addListener(_scheduleMemoryTextSave);
   }
 
   @override
   void dispose() {
     _timer?.cancel();
+    _memoryTextDebounce?.cancel();
     _memoryTextController.dispose();
     widget.recordingService.dispose();
     super.dispose();
@@ -56,88 +62,107 @@ class _RecordMemoryScreenState extends State<RecordMemoryScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('\u8bb2\u8bb2')),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(20),
-          children: [
-            Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (widget.thumbnailBytes != null) ...[
-                    AdaptivePhotoCard(
-                      imageBytes: widget.thumbnailBytes!,
-                      imageWidth: widget.asset.width,
-                      imageHeight: widget.asset.height,
-                      maxDesktopWidth: 360,
-                      maxHeightFactor: 0.28,
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-                  Icon(_state.icon, size: 56),
-                  const SizedBox(height: 16),
-                  Text(
-                    _state.title,
-                    style: Theme.of(context).textTheme.titleLarge,
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    widget.promptQuestion,
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '\u5f53\u524d\u7167\u7247\uff1a${widget.asset.assetId}\n\u62cd\u6444\u65f6\u95f4\uff1a${formatNullableDate(widget.asset.createdAt)}',
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _memoryTextController,
-                    minLines: 2,
-                    maxLines: 4,
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
-                      labelText: '\u6587\u5b57\u5907\u6ce8',
-                      hintText:
-                          '\u4e5f\u53ef\u4ee5\u53ea\u5199\u51e0\u53e5\u8bdd\uff0c\u4e0d\u5f55\u97f3',
-                    ),
-                  ),
-                  if (_state == RecordingScreenState.recording) ...[
+      body: PopScope(
+        canPop: _allowPop,
+        onPopInvokedWithResult: (didPop, result) async {
+          if (didPop || _isHandlingPop) {
+            return;
+          }
+          _isHandlingPop = true;
+          await _forceSaveMemoryText();
+          if (!context.mounted) {
+            return;
+          }
+          setState(() => _allowPop = true);
+          Navigator.of(context).pop(result);
+        },
+        child: SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.all(20),
+            children: [
+              Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (widget.thumbnailBytes != null) ...[
+                      AdaptivePhotoCard(
+                        imageBytes: widget.thumbnailBytes!,
+                        imageWidth: widget.asset.width,
+                        imageHeight: widget.asset.height,
+                        maxDesktopWidth: 360,
+                        maxHeightFactor: 0.28,
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+                    Icon(_state.icon, size: 56),
                     const SizedBox(height: 16),
                     Text(
-                      _formatElapsed(_elapsed),
-                      style: Theme.of(context).textTheme.headlineMedium,
+                      _state.title,
+                      style: Theme.of(context).textTheme.titleLarge,
+                      textAlign: TextAlign.center,
                     ),
-                  ],
-                  if (_relativeAudioPath != null) ...[
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 8),
                     Text(
-                      '\u5f55\u97f3\u6587\u4ef6\uff1a$_relativeAudioPath',
+                      widget.promptQuestion,
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '\u5f53\u524d\u7167\u7247\uff1a${widget.asset.assetId}\n\u62cd\u6444\u65f6\u95f4\uff1a${formatNullableDate(widget.asset.createdAt)}',
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: _memoryTextController,
+                      minLines: 2,
+                      maxLines: 4,
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                        labelText: '\u6587\u5b57\u5907\u6ce8',
+                        hintText:
+                            '\u4e5f\u53ef\u4ee5\u53ea\u5199\u51e0\u53e5\u8bdd\uff0c\u4e0d\u5f55\u97f3',
+                      ),
+                    ),
+                    if (_memoryTextSaveMessage != null) ...[
+                      const SizedBox(height: 8),
+                      Text(_memoryTextSaveMessage!),
+                    ],
+                    if (_state == RecordingScreenState.recording) ...[
+                      const SizedBox(height: 16),
+                      Text(
+                        _formatElapsed(_elapsed),
+                        style: Theme.of(context).textTheme.headlineMedium,
+                      ),
+                    ],
+                    if (_relativeAudioPath != null) ...[
+                      const SizedBox(height: 16),
+                      Text(
+                        '\u5f55\u97f3\u6587\u4ef6\uff1a$_relativeAudioPath',
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                    if (_errorMessage != null) ...[
+                      const SizedBox(height: 16),
+                      Text(
+                        _errorMessage!,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                            color: Theme.of(context).colorScheme.error),
+                      ),
+                    ],
+                    const SizedBox(height: 24),
+                    _buildActions(),
+                    const SizedBox(height: 12),
+                    const Text(
+                      '\u5f55\u97f3\u548c\u6587\u5b57\u5907\u6ce8\u53ea\u4fdd\u5b58\u5728\u672c\u673a App \u76ee\u5f55\uff0c\u4e0d\u4e0a\u4f20\u3001\u4e0d\u8f6c\u5199\u3002',
                       textAlign: TextAlign.center,
                     ),
                   ],
-                  if (_errorMessage != null) ...[
-                    const SizedBox(height: 16),
-                    Text(
-                      _errorMessage!,
-                      textAlign: TextAlign.center,
-                      style:
-                          TextStyle(color: Theme.of(context).colorScheme.error),
-                    ),
-                  ],
-                  const SizedBox(height: 24),
-                  _buildActions(),
-                  const SizedBox(height: 12),
-                  const Text(
-                    '\u5f55\u97f3\u548c\u6587\u5b57\u5907\u6ce8\u53ea\u4fdd\u5b58\u5728\u672c\u673a App \u76ee\u5f55\uff0c\u4e0d\u4e0a\u4f20\u3001\u4e0d\u8f6c\u5199\u3002',
-                    textAlign: TextAlign.center,
-                  ),
-                ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -183,7 +208,10 @@ class _RecordMemoryScreenState extends State<RecordMemoryScreen> {
               child: const Text('\u91cd\u65b0\u8bf7\u6c42'),
             ),
             TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
+              onPressed: () {
+                setState(() => _allowPop = true);
+                Navigator.of(context).pop(false);
+              },
               child: const Text('\u8fd4\u56de'),
             ),
           ],
@@ -247,6 +275,7 @@ class _RecordMemoryScreenState extends State<RecordMemoryScreen> {
 
   Future<void> _stopRecording() async {
     _timer?.cancel();
+    _memoryTextDebounce?.cancel();
     try {
       final path = await widget.recordingService.stop();
       if (!mounted) {
@@ -283,6 +312,7 @@ class _RecordMemoryScreenState extends State<RecordMemoryScreen> {
 
     setState(() => _state = RecordingScreenState.saving);
     try {
+      await _forceSaveMemoryText();
       await MemoryActionService(widget.memoryRepository).attachAudio(
         widget.asset,
         path,
@@ -306,6 +336,7 @@ class _RecordMemoryScreenState extends State<RecordMemoryScreen> {
   }
 
   Future<void> _discardRecording() async {
+    await _forceSaveMemoryText();
     await widget.recordingService.cancel();
     if (!mounted) {
       return;
@@ -313,7 +344,31 @@ class _RecordMemoryScreenState extends State<RecordMemoryScreen> {
     _finish(false);
   }
 
+  void _scheduleMemoryTextSave() {
+    _memoryTextDebounce?.cancel();
+    _memoryTextDebounce = Timer(const Duration(milliseconds: 700), () {
+      _forceSaveMemoryText();
+    });
+  }
+
+  Future<void> _forceSaveMemoryText() async {
+    final text = _memoryTextController.text.trim();
+    if (text.isEmpty) {
+      return;
+    }
+    setState(() => _memoryTextSaveMessage = '\u4fdd\u5b58\u4e2d...');
+    await MemoryActionService(widget.memoryRepository).saveMemoryText(
+      widget.asset,
+      text,
+      promptQuestion: widget.promptQuestion,
+    );
+    if (mounted) {
+      setState(() => _memoryTextSaveMessage = '\u5df2\u81ea\u52a8\u4fdd\u5b58');
+    }
+  }
+
   void _finish(bool saved) {
+    setState(() => _allowPop = true);
     final navigator = Navigator.of(context);
     if (navigator.canPop()) {
       navigator.pop(saved);
@@ -322,6 +377,7 @@ class _RecordMemoryScreenState extends State<RecordMemoryScreen> {
 
   void _startTimer() {
     _timer?.cancel();
+    _memoryTextDebounce?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) {
         return;

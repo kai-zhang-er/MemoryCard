@@ -8,13 +8,13 @@ Memory Cards is an offline-first Flutter MVP for revisiting local photos as ligh
 - On Windows, the user chooses a local photo folder; the app scans it read-only.
 - The app does not upload photos, recordings, or memory records.
 - There are no accounts, cloud sync, social sharing, transcription, or AI autobiography features in the MVP.
-- Export is user-initiated and writes a local `memories.json` file.
+- Export is user-initiated and writes local JSON plus human-readable Markdown files.
 
 ## Local Storage
 
 - Memory records are stored in local SQLite through `MemoryRepository`.
 - Audio recordings are stored in the app documents directory under `audio/YYYY/`.
-- JSON export writes to the app documents directory under `exports/memories.json`.
+- Export writes to the app documents directory under `exports/memories.json` and `exports/markdown/`.
 
 ## Permissions
 

@@ -136,6 +136,10 @@ class _FakeExportService extends ExportService {
 
 class _DeniedPhotoLibraryService implements PhotoLibraryService {
   @override
+  Future<PhotoDeleteResult> deleteOriginalPhoto(String assetId) async =>
+      const PhotoDeleteResult.unsupported();
+
+  @override
   Future<List<PhotoAsset>> getPhotoAssets({int limit = 80}) async => const [];
 
   @override

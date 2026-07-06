@@ -17,6 +17,10 @@ abstract class PhotoLibraryService {
   Future<DateTime?> getPhotoTime(String assetId);
 
   Future<void> openSettings();
+
+  Future<PhotoDeleteResult> deleteOriginalPhoto(String assetId) async {
+    return const PhotoDeleteResult.unsupported();
+  }
 }
 
 class PhotoManagerPhotoLibraryService implements PhotoLibraryService {
@@ -68,6 +72,19 @@ class PhotoManagerPhotoLibraryService implements PhotoLibraryService {
   @override
   Future<void> openSettings() {
     return PhotoManager.openSetting();
+  }
+
+  @override
+  Future<PhotoDeleteResult> deleteOriginalPhoto(String assetId) async {
+    try {
+      final deletedIds = await PhotoManager.editor.deleteWithIds([assetId]);
+      if (deletedIds.contains(assetId)) {
+        return const PhotoDeleteResult.success();
+      }
+      return const PhotoDeleteResult.cancelled();
+    } catch (error) {
+      return PhotoDeleteResult.failure(error.toString());
+    }
   }
 
   PhotoAsset _toPhotoAsset(AssetEntity entity) {
@@ -190,6 +207,21 @@ class WindowsFolderPhotoLibraryService implements PhotoLibraryService {
     _cachedAssets = null;
   }
 
+  @override
+  Future<PhotoDeleteResult> deleteOriginalPhoto(String assetId) async {
+    try {
+      final file = File(assetId);
+      if (!isSupportedImagePath(file.path) || !await file.exists()) {
+        return const PhotoDeleteResult.notFound();
+      }
+      await file.delete();
+      _cachedAssets = null;
+      return const PhotoDeleteResult.success();
+    } catch (error) {
+      return PhotoDeleteResult.failure(error.toString());
+    }
+  }
+
   bool isSupportedImagePath(String path) {
     return supportedExtensions.contains(p.extension(path).toLowerCase());
   }
@@ -206,4 +238,27 @@ enum PhotoPermissionResult {
   bool get canAccessPhotos => this == authorized || this == limited;
 
   bool get requiresFolderSelection => this == folderNotSelected;
+}
+
+enum PhotoDeleteStatus { success, cancelled, notFound, unsupported, failure }
+
+class PhotoDeleteResult {
+  const PhotoDeleteResult._(this.status, [this.message]);
+
+  const PhotoDeleteResult.success() : this._(PhotoDeleteStatus.success);
+
+  const PhotoDeleteResult.cancelled() : this._(PhotoDeleteStatus.cancelled);
+
+  const PhotoDeleteResult.notFound() : this._(PhotoDeleteStatus.notFound);
+
+  const PhotoDeleteResult.unsupported([String? message])
+      : this._(PhotoDeleteStatus.unsupported, message);
+
+  const PhotoDeleteResult.failure(String message)
+      : this._(PhotoDeleteStatus.failure, message);
+
+  final PhotoDeleteStatus status;
+  final String? message;
+
+  bool get isSuccess => status == PhotoDeleteStatus.success;
 }

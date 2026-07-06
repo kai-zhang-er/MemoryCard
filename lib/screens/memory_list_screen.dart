@@ -74,6 +74,7 @@ class _MemoryListScreenState extends State<MemoryListScreen> {
                     leading: MemoryThumbnail(
                       assetId: record.assetId,
                       photoLibraryService: widget.photoLibraryService,
+                      isDeleted: record.photoDeleted,
                     ),
                     title: const Text('\u7167\u7247\u8bb0\u5fc6'),
                     subtitle: Column(
@@ -131,6 +132,8 @@ class _MemoryListScreenState extends State<MemoryListScreen> {
           repository: widget.repository,
           photoLibraryService: widget.photoLibraryService,
           audioPlaybackControllerFactory: widget.audioPlaybackControllerFactory,
+          allowPermanentPhotoDelete:
+              widget.filter == MemoryListFilter.deleteCandidates,
         ),
       ),
     );

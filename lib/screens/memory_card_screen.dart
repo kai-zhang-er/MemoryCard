@@ -69,6 +69,7 @@ class _MemoryCardScreenState extends State<MemoryCardScreen> {
   String? _errorMessage;
   bool _isSavingAction = false;
   bool _isSavingTags = false;
+  String? _tagSaveMessage;
   SessionSummary _sessionSummary = const SessionSummary();
 
   bool get _usesFolderSelection =>
@@ -151,11 +152,11 @@ class _MemoryCardScreenState extends State<MemoryCardScreen> {
                 isLimited: _permission == PhotoPermissionResult.limited,
                 isSavingAction: _isSavingAction,
                 isSavingTags: _isSavingTags,
+                tagSaveMessage: _tagSaveMessage,
                 promptQuestion: _currentPromptQuestion!,
                 selectedTags: _selectedTags,
                 quickTags: _quickTags,
                 onTagSelected: _toggleTag,
-                onSaveTags: _saveSelectedTags,
                 onTalk: _openRecordPlaceholder,
                 onMarkImportant: () =>
                     _saveAction(MemoryRecordAction.important),
@@ -368,57 +369,57 @@ class _MemoryCardScreenState extends State<MemoryCardScreen> {
     }
   }
 
-  Future<void> _saveSelectedTags() async {
+  Future<void> _toggleTag(String tag, bool selected) async {
     final asset = _currentAsset;
     final promptQuestion = _currentPromptQuestion;
-    if (asset == null ||
-        promptQuestion == null ||
-        _selectedTags.isEmpty ||
-        _isSavingTags) {
+    if (asset == null || promptQuestion == null || _isSavingTags) {
       return;
     }
 
-    setState(() => _isSavingTags = true);
+    final previousTags = _selectedTags;
+    final updated = {..._selectedTags};
+    if (selected) {
+      updated.add(tag);
+    } else {
+      updated.remove(tag);
+    }
+
+    setState(() {
+      _selectedTags = updated;
+      _isSavingTags = true;
+      _tagSaveMessage = '保存中...';
+    });
+
     try {
       await MemoryActionService(widget.memoryRepository).saveTags(
         asset,
-        _selectedTags.toList(growable: false),
+        updated.toList(growable: false),
         promptQuestion: promptQuestion,
+        replace: true,
       );
       if (!mounted) {
         return;
       }
       setState(() {
         _isSavingTags = false;
-        _sessionSummary = _sessionSummary.copyWith(
-          taggedCount: _sessionSummary.taggedCount + 1,
-        );
+        _tagSaveMessage = '已自动保存';
+        if (updated.isNotEmpty && previousTags.isEmpty) {
+          _sessionSummary = _sessionSummary.copyWith(
+            taggedCount: _sessionSummary.taggedCount + 1,
+          );
+        }
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('标签已保存')),
-      );
       await _refreshProcessedAssetIds();
     } catch (error) {
       if (!mounted) {
         return;
       }
-      setState(() => _isSavingTags = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('保存标签失败：$error')),
-      );
+      setState(() {
+        _selectedTags = previousTags;
+        _isSavingTags = false;
+        _tagSaveMessage = '保存标签失败：$error';
+      });
     }
-  }
-
-  void _toggleTag(String tag, bool selected) {
-    setState(() {
-      final updated = {..._selectedTags};
-      if (selected) {
-        updated.add(tag);
-      } else {
-        updated.remove(tag);
-      }
-      _selectedTags = updated;
-    });
   }
 
   Future<void> _openRecordPlaceholder() async {
@@ -517,11 +518,11 @@ class _LoadedPhotoView extends StatelessWidget {
     required this.isLimited,
     required this.isSavingAction,
     required this.isSavingTags,
+    required this.tagSaveMessage,
     required this.promptQuestion,
     required this.selectedTags,
     required this.quickTags,
     required this.onTagSelected,
-    required this.onSaveTags,
     required this.onTalk,
     required this.onMarkImportant,
     required this.onMarkDeleteCandidate,
@@ -533,11 +534,11 @@ class _LoadedPhotoView extends StatelessWidget {
   final bool isLimited;
   final bool isSavingAction;
   final bool isSavingTags;
+  final String? tagSaveMessage;
   final String promptQuestion;
   final Set<String> selectedTags;
   final List<String> quickTags;
   final void Function(String tag, bool selected) onTagSelected;
-  final VoidCallback onSaveTags;
   final VoidCallback onTalk;
   final VoidCallback onMarkImportant;
   final VoidCallback onMarkDeleteCandidate;
@@ -595,15 +596,13 @@ class _LoadedPhotoView extends StatelessWidget {
                   ),
               ],
             ),
-            const SizedBox(height: 12),
-            Center(
-              child: OutlinedButton.icon(
-                onPressed:
-                    selectedTags.isEmpty || isSavingTags ? null : onSaveTags,
-                icon: const Icon(Icons.sell_outlined),
-                label: Text(isSavingTags ? '保存中...' : '保存标签'),
+            if (tagSaveMessage != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                tagSaveMessage!,
+                textAlign: TextAlign.center,
               ),
-            ),
+            ],
             const SizedBox(height: 20),
             ActionButtons(
               children: [

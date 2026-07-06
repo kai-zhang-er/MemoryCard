@@ -11,12 +11,14 @@ class MemoryThumbnail extends StatelessWidget {
     required this.photoLibraryService,
     this.size = 64,
     this.thumbnailSize = 160,
+    this.isDeleted = false,
   });
 
   final String assetId;
   final PhotoLibraryService photoLibraryService;
   final double size;
   final int thumbnailSize;
+  final bool isDeleted;
 
   @override
   Widget build(BuildContext context) {

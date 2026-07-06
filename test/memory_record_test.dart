@@ -14,6 +14,8 @@ void main() {
       important: true,
       deleteCandidate: false,
       skipped: true,
+      photoDeleted: true,
+      photoDeletedAt: DateTime.utc(2026, 7, 4),
       userTags: const ['旅行', '朋友'],
       aiLightTags: const ['old_photo'],
       audioPath: 'audio/fake.m4a',
@@ -26,6 +28,8 @@ void main() {
     expect(restored.important, isTrue);
     expect(restored.deleteCandidate, isFalse);
     expect(restored.skipped, isTrue);
+    expect(restored.photoDeleted, isTrue);
+    expect(restored.photoDeletedAt, DateTime.utc(2026, 7, 4));
     expect(restored.userTags, ['旅行', '朋友']);
     expect(restored.aiLightTags, ['old_photo']);
     expect(restored.audioPath, 'audio/fake.m4a');
@@ -39,6 +43,8 @@ void main() {
       createdAt: now,
       updatedAt: now,
       important: true,
+      photoDeleted: true,
+      photoDeletedAt: DateTime.utc(2026, 7, 4),
       userTags: const ['家庭'],
     );
 
@@ -46,6 +52,9 @@ void main() {
 
     expect(json['important'], isTrue);
     expect(json['delete_candidate'], isFalse);
+    expect(json['photo_deleted'], isTrue);
+    expect(
+        json['photo_deleted_at'], DateTime.utc(2026, 7, 4).toIso8601String());
     expect(json['user_tags'], ['家庭']);
     expect(json['review_status'], 'raw');
   });

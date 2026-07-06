@@ -76,7 +76,6 @@ void main() {
     await tester.pump();
     await tester.tap(find.text('家人'));
     await tester.pump();
-    await tester.tap(find.text('保存标签'));
     await _pumpSeveral(tester);
 
     final saved = await repository.getByAssetId(firstShown);
@@ -198,7 +197,6 @@ void main() {
     );
     await tester.tap(find.text('旅行'));
     await tester.pump();
-    await tester.tap(find.text('保存标签'));
     await _pumpSeveral(tester);
     await _tapVisible(tester, find.byIcon(Icons.star_outline));
     await _pumpSeveral(tester);
@@ -306,6 +304,10 @@ class _FakePhotoLibraryService implements PhotoLibraryService {
   final List<PhotoAsset> assets;
   final Map<String, Uint8List> thumbnails;
   final List<String> thumbnailRequests = [];
+
+  @override
+  Future<PhotoDeleteResult> deleteOriginalPhoto(String assetId) async =>
+      const PhotoDeleteResult.unsupported();
 
   @override
   Future<List<PhotoAsset>> getPhotoAssets({int limit = 80}) async {

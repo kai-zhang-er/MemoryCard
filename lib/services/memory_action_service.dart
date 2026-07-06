@@ -59,16 +59,35 @@ class MemoryActionService {
     List<String> tags, {
     String? promptQuestion,
     DateTime? now,
+    bool replace = false,
   }) async {
     final timestamp = now ?? DateTime.now();
     final base = await _baseRecord(asset, timestamp, promptQuestion);
-    final mergedTags = <String>{
-      ...base.userTags,
-      ...tags.where((tag) => tag.trim().isNotEmpty).map((tag) => tag.trim()),
-    }.toList(growable: false);
+    final normalizedTags =
+        tags.where((tag) => tag.trim().isNotEmpty).map((tag) => tag.trim());
+    final savedTags = replace
+        ? <String>{...normalizedTags}.toList(growable: false)
+        : <String>{...base.userTags, ...normalizedTags}.toList(growable: false);
 
     final updated = base.copyWith(
-      userTags: mergedTags,
+      userTags: savedTags,
+      promptQuestion: promptQuestion ?? base.promptQuestion,
+      updatedAt: timestamp,
+    );
+    await repository.upsert(updated);
+    return updated;
+  }
+
+  Future<MemoryRecord> saveMemoryText(
+    PhotoAsset asset,
+    String memoryText, {
+    String? promptQuestion,
+    DateTime? now,
+  }) async {
+    final timestamp = now ?? DateTime.now();
+    final base = await _baseRecord(asset, timestamp, promptQuestion);
+    final updated = base.copyWith(
+      memoryText: memoryText.trim(),
       promptQuestion: promptQuestion ?? base.promptQuestion,
       updatedAt: timestamp,
     );

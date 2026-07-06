@@ -12,6 +12,8 @@ class MemoryRecord {
     this.important = false,
     this.deleteCandidate = false,
     this.skipped = false,
+    this.photoDeleted = false,
+    this.photoDeletedAt,
     this.userTags = const [],
     this.aiLightTags = const [],
     this.promptQuestion =
@@ -32,6 +34,8 @@ class MemoryRecord {
   final bool important;
   final bool deleteCandidate;
   final bool skipped;
+  final bool photoDeleted;
+  final DateTime? photoDeletedAt;
   final List<String> userTags;
   final List<String> aiLightTags;
   final String promptQuestion;
@@ -51,6 +55,9 @@ class MemoryRecord {
     bool? important,
     bool? deleteCandidate,
     bool? skipped,
+    bool? photoDeleted,
+    DateTime? photoDeletedAt,
+    bool clearPhotoDeletedAt = false,
     List<String>? userTags,
     List<String>? aiLightTags,
     String? promptQuestion,
@@ -71,6 +78,9 @@ class MemoryRecord {
       important: important ?? this.important,
       deleteCandidate: deleteCandidate ?? this.deleteCandidate,
       skipped: skipped ?? this.skipped,
+      photoDeleted: photoDeleted ?? this.photoDeleted,
+      photoDeletedAt:
+          clearPhotoDeletedAt ? null : photoDeletedAt ?? this.photoDeletedAt,
       userTags: userTags ?? this.userTags,
       aiLightTags: aiLightTags ?? this.aiLightTags,
       promptQuestion: promptQuestion ?? this.promptQuestion,
@@ -93,6 +103,8 @@ class MemoryRecord {
       'important': important ? 1 : 0,
       'delete_candidate': deleteCandidate ? 1 : 0,
       'skipped': skipped ? 1 : 0,
+      'photo_deleted': photoDeleted ? 1 : 0,
+      'photo_deleted_at': photoDeletedAt?.toIso8601String(),
       'user_tags': jsonEncode(userTags),
       'ai_light_tags': jsonEncode(aiLightTags),
       'prompt_question': promptQuestion,
@@ -115,6 +127,8 @@ class MemoryRecord {
       important: _boolFromDb(map['important']),
       deleteCandidate: _boolFromDb(map['delete_candidate']),
       skipped: _boolFromDb(map['skipped']),
+      photoDeleted: _boolFromDb(map['photo_deleted']),
+      photoDeletedAt: _dateOrNull(map['photo_deleted_at']),
       userTags: _stringListFromJson(map['user_tags']),
       aiLightTags: _stringListFromJson(map['ai_light_tags']),
       promptQuestion: map['prompt_question'] as String? ??
@@ -138,6 +152,8 @@ class MemoryRecord {
       'important': important,
       'delete_candidate': deleteCandidate,
       'skipped': skipped,
+      'photo_deleted': photoDeleted,
+      'photo_deleted_at': photoDeletedAt?.toIso8601String(),
       'user_tags': userTags,
       'ai_light_tags': aiLightTags,
       'prompt_question': promptQuestion,
@@ -165,9 +181,8 @@ class MemoryRecord {
     return null;
   }
 
-  static DateTime _dateOrNow(Object? value) {
-    return _dateOrNull(value) ?? DateTime.now();
-  }
+  static DateTime _dateOrNow(Object? value) =>
+      _dateOrNull(value) ?? DateTime.now();
 
   static List<String> _stringListFromJson(Object? value) {
     if (value is! String || value.isEmpty) {

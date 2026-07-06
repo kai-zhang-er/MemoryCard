@@ -230,6 +230,34 @@ void main() {
     expect(saved.audioPath, 'audio/2026/memory_photo_001.m4a');
     expect(saved.userTags, ['鏈嬪弸']);
   });
+  test('saving memory text creates a record and keeps transcript reserved',
+      () async {
+    await service.saveMemoryText(
+      _asset('photo_note'),
+      '\u8fd9\u662f\u672c\u79d1\u6bd5\u4e1a\u65c5\u884c\u3002',
+      promptQuestion: '\u63d0\u793a\u95ee\u9898',
+      now: DateTime.utc(2026, 7, 3, 12),
+    );
+
+    final saved = await repository.getByAssetId('photo_note');
+
+    expect(saved, isNotNull);
+    expect(saved!.memoryText,
+        '\u8fd9\u662f\u672c\u79d1\u6bd5\u4e1a\u65c5\u884c\u3002');
+    expect(saved.transcript, '');
+    expect(saved.promptQuestion, '\u63d0\u793a\u95ee\u9898');
+  });
+
+  test('replacing saved tags can remove an unselected tag', () async {
+    final asset = _asset('photo_001');
+    await service.saveTags(asset, ['A', 'B']);
+    await service.saveTags(asset, ['B'], replace: true);
+
+    final saved = await repository.getByAssetId('photo_001');
+
+    expect(saved, isNotNull);
+    expect(saved!.userTags, ['B']);
+  });
 }
 
 PhotoAsset _asset(String id) {

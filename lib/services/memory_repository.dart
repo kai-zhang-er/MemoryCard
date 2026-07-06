@@ -29,14 +29,16 @@ class MemoryRepository {
     final opened = factory == null
         ? await openDatabase(
             dbPath,
-            version: 1,
+            version: 2,
             onCreate: _createDatabase,
+            onUpgrade: _upgradeDatabase,
           )
         : await factory.openDatabase(
             dbPath,
             options: OpenDatabaseOptions(
-              version: 1,
+              version: 2,
               onCreate: _createDatabase,
+              onUpgrade: _upgradeDatabase,
             ),
           );
     _database = opened;
@@ -137,6 +139,18 @@ class MemoryRepository {
     return rows.map(MemoryRecord.fromMap).toList(growable: false);
   }
 
+  Future<void> _upgradeDatabase(
+      Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute(
+        'ALTER TABLE $tableName ADD COLUMN photo_deleted INTEGER NOT NULL DEFAULT 0',
+      );
+      await db.execute(
+        'ALTER TABLE $tableName ADD COLUMN photo_deleted_at TEXT',
+      );
+    }
+  }
+
   Future<String> _defaultDatabasePath() async {
     final directory = await getApplicationDocumentsDirectory();
     return p.join(directory.path, databaseName);
@@ -155,6 +169,8 @@ class MemoryRepository {
         important INTEGER NOT NULL DEFAULT 0,
         delete_candidate INTEGER NOT NULL DEFAULT 0,
         skipped INTEGER NOT NULL DEFAULT 0,
+        photo_deleted INTEGER NOT NULL DEFAULT 0,
+        photo_deleted_at TEXT,
         user_tags TEXT NOT NULL DEFAULT '[]',
         ai_light_tags TEXT NOT NULL DEFAULT '[]',
         prompt_question TEXT NOT NULL,

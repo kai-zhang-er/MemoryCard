@@ -126,6 +126,7 @@ class ExportService {
       if (record.important) '重要',
       if (record.deleteCandidate) '待删除',
       if (record.skipped) '已跳过',
+      if (record.photoDeleted) '\u539f\u59cb\u7167\u7247\u5df2\u5220\u9664',
     ];
   }
 

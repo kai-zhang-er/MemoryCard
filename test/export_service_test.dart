@@ -35,7 +35,8 @@ void main() {
 
   test('exports all records to memories json', () async {
     await repository.upsert(_record('memory_001', important: true));
-    await repository.upsert(_record('memory_002', deleteCandidate: true));
+    await repository.upsert(
+        _record('memory_002', deleteCandidate: true, photoDeleted: true));
     final service = ExportService(
       repository,
       directoryProvider: () async => documentsDir,
@@ -58,6 +59,11 @@ void main() {
             .whereType<Map<String, Object?>>()
             .map((record) => record['memory_id']),
         containsAll(['memory_001', 'memory_002']));
+    final deletedRecord = records
+        .whereType<Map<String, Object?>>()
+        .firstWhere((record) => record['memory_id'] == 'memory_002');
+    expect(deletedRecord['photo_deleted'], isTrue);
+    expect(deletedRecord['photo_deleted_at'], isNotNull);
   });
 
   test('exports json and human-readable markdown files', () async {
@@ -65,6 +71,7 @@ void main() {
       _record(
         'memory:001',
         important: true,
+        photoDeleted: true,
         audioPath: 'audio/2026/memory.m4a',
         memoryText:
             '\u8fd9\u662f\u672c\u79d1\u6bd5\u4e1a\u65c5\u884c\uff0c\u5728\u53a6\u95e8\u3002',
@@ -97,6 +104,7 @@ void main() {
     expect(files, contains('unknown-date_memory_without_date.md'));
     expect(markdown, contains('# \u7167\u7247\u8bb0\u5fc6'));
     expect(markdown, contains('- \u6807\u7b7e\uff1atest'));
+    expect(markdown, contains('\u539f\u59cb\u7167\u7247\u5df2\u5220\u9664'));
     expect(markdown, contains('- \u72b6\u6001\uff1a\u91cd\u8981'));
     expect(markdown,
         contains('- \u5f55\u97f3\u8def\u5f84\uff1aaudio/2026/memory.m4a'));
@@ -119,6 +127,7 @@ MemoryRecord _record(
   bool important = false,
   bool deleteCandidate = false,
   bool hasPhotoTime = true,
+  bool photoDeleted = false,
   String? audioPath,
   String memoryText = '',
   String transcript = '',
@@ -134,6 +143,8 @@ MemoryRecord _record(
     updatedAt: now,
     important: important,
     deleteCandidate: deleteCandidate,
+    photoDeleted: photoDeleted,
+    photoDeletedAt: photoDeleted ? DateTime.utc(2026, 7, 4) : null,
     userTags: const ['test'],
     aiLightTags: const ['old_photo'],
     audioPath: audioPath,
