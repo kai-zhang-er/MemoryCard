@@ -40,6 +40,8 @@ void main() {
     expect(find.byType(MemoryThumbnail), findsNWidgets(2));
     expect(find.byType(AudioPlayerTile), findsOneWidget);
     expect(find.text(_playAudioText), findsOneWidget);
+    expect(find.textContaining('Asset ID:'), findsNothing);
+    expect(find.textContaining('Memory ID:'), findsNothing);
     expect(
       photoLibraryService.thumbnailRequests,
       containsAll(['asset_memory_with_audio', 'asset_memory_without_audio']),

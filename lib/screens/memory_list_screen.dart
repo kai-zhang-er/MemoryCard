@@ -70,9 +70,13 @@ class _MemoryListScreenState extends State<MemoryListScreen> {
                 final record = records[index];
                 return Card(
                   child: ListTile(
+                    contentPadding: const EdgeInsets.all(14),
+                    minVerticalPadding: 8,
                     onTap: () => _openDetail(record),
                     leading: MemoryThumbnail(
                       assetId: record.assetId,
+                      size: 84,
+                      thumbnailSize: 240,
                       photoLibraryService: widget.photoLibraryService,
                       isDeleted: record.photoDeleted,
                     ),
@@ -83,8 +87,15 @@ class _MemoryListScreenState extends State<MemoryListScreen> {
                         const SizedBox(height: 8),
                         Text(
                             '\u62cd\u6444\u65f6\u95f4: ${formatNullableDate(record.photoTime)}'),
-                        Text('Asset ID: ${record.assetId}'),
-                        Text('Memory ID: ${record.memoryId}'),
+                        if (record.memoryText.trim().isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            record.memoryText.trim(),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                        ],
                         Text(
                             '\u66f4\u65b0\u65f6\u95f4: ${record.updatedAt.toLocal()}'),
                         const SizedBox(height: 8),

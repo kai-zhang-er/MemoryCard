@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:memory_cards/app.dart';
 import 'package:memory_cards/screens/home_screen.dart';
 import 'package:memory_cards/services/memory_repository.dart';
 import 'package:memory_cards/services/photo_library_service.dart';
@@ -9,6 +10,7 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(390, 844));
     await tester.pumpWidget(
       MaterialApp(
+        theme: MemoryCardsTheme.light,
         home: HomeScreen(
           repository: MemoryRepository(),
           photoLibraryServiceFactory: () =>

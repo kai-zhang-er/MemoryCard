@@ -32,16 +32,40 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(title: const Text('\u8bb0\u5fc6\u5361')),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
           children: [
-            Text(
-              'Memory Cards',
-              style: Theme.of(context).textTheme.headlineMedium,
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(24),
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF397D5D), Color(0xFF1D4D39)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.auto_awesome_rounded,
+                      color: Colors.white, size: 36),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Text(
+                      '\u4ece\u4e00\u5f20\u7167\u7247\u5f00\u59cb',
+                      style: Theme.of(context)
+                          .textTheme
+                          .headlineSmall
+                          ?.copyWith(
+                              color: Colors.white, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 20),
             FilledButton.icon(
               onPressed: () => _openMemoryCard(),
-              icon: const Icon(Icons.play_arrow),
+              icon: const Icon(Icons.auto_awesome_rounded),
               label: const Text('\u5f00\u59cb\u4e00\u5c40'),
             ),
             const SizedBox(height: 12),
@@ -50,6 +74,10 @@ class _HomeScreenState extends State<HomeScreen> {
               icon: const Icon(Icons.today_outlined),
               label: const Text('\u4eca\u65e5 5 \u5f20'),
             ),
+            const SizedBox(height: 12),
+            const SizedBox(height: 16),
+            Text('\u7ba1\u7406\u4f60\u7684\u56de\u5fc6',
+                style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 12),
             OutlinedButton.icon(
               onPressed: () => _openList(MemoryListFilter.all),
